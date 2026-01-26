@@ -10,10 +10,21 @@ export class Categorizer {
       SUBSCRIPTIONS: ['SPOTIFY', 'APPLE', 'MICROSOFT', 'NETFLIX', 'AMAZON PRIME', 'GOOGLE'],
       UTILITIES: ['ENTEGA', 'VATTENFALL', 'STADTWERKE', 'TELEKOM', 'VODAFONE', 'O2'],
       INSURANCE: ['BARMER', 'TK', 'AOK', 'ALLIANZ', 'HUK'],
-      INCOME: ['EINGANG', 'GEHALT', 'LOHN', 'SALARY'],
       RENT: ['MIETE', 'RENT', 'VERMIETUNG'],
       CASH: ['GELDAUTOMAT', 'ATM', 'BARGELD'],
       OTHER: []
+    };
+
+    // Income categories for better classification
+    this.incomeCategories = {
+      SALARY: ['GEHALT', 'LOHN', 'SALARY', 'WAGE', 'PAYROLL', 'ARBEITGEBER', 'EMPLOYER'],
+      BENEFITS: ['KINDERGELD', 'BAFöG', 'WOHNGELD', 'ARBEITSLOSENGELD', 'RENTE', 'PENSION', 'BENEFIT'],
+      REFUND: ['ERSTATTUNG', 'RÜCKERSTATTUNG', 'REFUND', 'REIMBURSEMENT', 'STORNO'],
+      TRANSFER: ['ÜBERWEISUNG', 'TRANSFER', 'EINGANG', 'DEPOSIT'],
+      RENTAL_INCOME: ['MIETEINNAHME', 'MIETE VON', 'RENTAL INCOME'],
+      INVESTMENT: ['DIVIDENDE', 'ZINSEN', 'DIVIDEND', 'INTEREST', 'INVESTMENT'],
+      FREELANCE: ['HONORAR', 'RECHNUNG', 'INVOICE', 'FREELANCE', 'AUFTRAG'],
+      OTHER_INCOME: []
     };
   }
 
@@ -60,12 +71,18 @@ export class Categorizer {
 
     // Check for income (positive amounts)
     if (transaction.isIncome()) {
-      // Check if payee indicates income
-      if (this.matchesCategory(normalizedMerchant, this.categories.INCOME)) {
-        return 'INCOME';
+      // Check specific income categories
+      for (const [category, keywords] of Object.entries(this.incomeCategories)) {
+        if (category === 'OTHER_INCOME') continue;
+
+        // Check both payee and purpose for income classification
+        if (this.matchesCategory(normalizedMerchant, keywords) ||
+            this.matchesCategory(transaction.purpose.toUpperCase(), keywords)) {
+          return category;
+        }
       }
-      // Generic income
-      return 'INCOME';
+      // Generic income fallback
+      return 'OTHER_INCOME';
     }
 
     // Check category rules from settings
@@ -211,17 +228,27 @@ export class Categorizer {
    */
   getCategoryColor(category) {
     const colors = {
+      // Expense categories
       GROCERIES: '#4CAF50',
       TRANSPORT: '#2196F3',
       FOOD_DELIVERY: '#FF9800',
       SUBSCRIPTIONS: '#9C27B0',
       UTILITIES: '#00BCD4',
       INSURANCE: '#F44336',
-      INCOME: '#8BC34A',
       RENT: '#795548',
       CASH: '#9E9E9E',
       HEALTH: '#2196FF',
-      OTHER: '#607D8B'
+      OTHER: '#607D8B',
+
+      // Income categories (green shades)
+      SALARY: '#66BB6A',
+      BENEFITS: '#81C784',
+      REFUND: '#A5D6A7',
+      TRANSFER: '#C8E6C9',
+      RENTAL_INCOME: '#4DB6AC',
+      INVESTMENT: '#26A69A',
+      FREELANCE: '#80CBC4',
+      OTHER_INCOME: '#8BC34A'
     };
 
     // Check static colors first
