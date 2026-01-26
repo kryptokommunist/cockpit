@@ -267,6 +267,15 @@ export class ProjectionService {
   }
 
   /**
+   * Clear all projections
+   */
+  clearAll() {
+    this.recurringItems = [];
+    this.oneTimeItems = [];
+    console.log('[ProjectionService] Cleared all projections');
+  }
+
+  /**
    * Save projections to localStorage
    */
   async save() {

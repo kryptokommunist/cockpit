@@ -224,6 +224,11 @@ export class FutureChartManager {
    * Create category chart
    */
   createCategoryChart(canvas) {
+    this.categoryViewType = 'expense'; // 'expense' or 'income'
+    this.categoryGroupBy = 'all'; // 'all', 'month'
+    this.setupCategoryTabs(canvas);
+    this.setupCategorySelectors(canvas);
+
     this.categoryChart = new Chart(canvas, {
       type: 'doughnut',
       data: {
@@ -261,16 +266,96 @@ export class FutureChartManager {
   }
 
   /**
+   * Setup category tabs for income/expense
+   */
+  setupCategoryTabs(canvas) {
+    const container = canvas.parentElement;
+
+    // Check if tabs already exist
+    if (container.querySelector('.category-tabs')) {
+      return;
+    }
+
+    const tabsContainer = document.createElement('div');
+    tabsContainer.className = 'category-tabs';
+    tabsContainer.innerHTML = `
+      <button class="category-tab active" data-type="expense">Unique Expenses</button>
+      <button class="category-tab" data-type="income">Unique Income</button>
+    `;
+
+    container.insertBefore(tabsContainer, container.firstChild);
+
+    // Add click handlers
+    const tabs = tabsContainer.querySelectorAll('.category-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        // Update active state
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        // Update view type
+        this.categoryViewType = tab.dataset.type;
+        this.updateCategoryChart();
+      });
+    });
+  }
+
+  /**
+   * Setup category selectors (groupby dropdown)
+   */
+  setupCategorySelectors(canvas) {
+    const container = canvas.parentElement;
+
+    // Check if selectors already exist
+    if (container.querySelector('.category-selectors')) {
+      return;
+    }
+
+    const selectorsContainer = document.createElement('div');
+    selectorsContainer.className = 'category-selectors';
+    selectorsContainer.innerHTML = `
+      <div class="category-selector-row">
+        <label>
+          Group by:
+          <select id="future-category-groupby-select">
+            <option value="all">Total</option>
+            <option value="month">Month</option>
+          </select>
+        </label>
+      </div>
+    `;
+
+    container.insertBefore(selectorsContainer, canvas);
+
+    const groupBySelect = selectorsContainer.querySelector('#future-category-groupby-select');
+    groupBySelect.addEventListener('change', (e) => {
+      this.categoryGroupBy = e.target.value;
+      this.updateCategoryChart();
+    });
+  }
+
+  /**
    * Update category chart with projections
    */
   updateCategoryChart() {
     if (!this.categoryChart) return;
 
-    // Group projections by category (expenses only)
+    if (this.categoryGroupBy === 'all') {
+      this.updateCategoryChartTotal();
+    } else {
+      this.updateCategoryChartGrouped();
+    }
+  }
+
+  /**
+   * Update category chart - total view
+   */
+  updateCategoryChartTotal() {
+    // Group projections by category based on view type
     const categoryTotals = {};
 
     this.projections
-      .filter(p => !p.isIncome)
+      .filter(p => this.categoryViewType === 'expense' ? !p.isIncome : p.isIncome)
       .forEach(p => {
         const category = p.category;
         if (!categoryTotals[category]) {
@@ -278,6 +363,14 @@ export class FutureChartManager {
         }
         categoryTotals[category] += Math.abs(p.amount);
       });
+
+    // Calculate total and count for summary
+    const total = Object.values(categoryTotals).reduce((sum, val) => sum + val, 0);
+    const count = this.projections.filter(p =>
+      this.categoryViewType === 'expense' ? !p.isIncome : p.isIncome
+    ).length;
+
+    this.updateCategorySummary(total, count, 'Total');
 
     // Sort by amount
     const sorted = Object.entries(categoryTotals)
@@ -294,9 +387,132 @@ export class FutureChartManager {
   }
 
   /**
+   * Update category chart - grouped by month
+   */
+  updateCategoryChartGrouped() {
+    // Group projections by month and category
+    const monthGroups = {};
+
+    this.projections
+      .filter(p => this.categoryViewType === 'expense' ? !p.isIncome : p.isIncome)
+      .forEach(p => {
+        const monthKey = format(p.date, 'yyyy-MM');
+
+        if (!monthGroups[monthKey]) {
+          monthGroups[monthKey] = {};
+        }
+
+        const category = p.category;
+        if (!monthGroups[monthKey][category]) {
+          monthGroups[monthKey][category] = 0;
+        }
+        monthGroups[monthKey][category] += Math.abs(p.amount);
+      });
+
+    // Calculate average per month for each category
+    const monthCount = Object.keys(monthGroups).length || 1;
+    const categoryAverages = {};
+
+    Object.values(monthGroups).forEach(monthData => {
+      Object.entries(monthData).forEach(([category, amount]) => {
+        if (!categoryAverages[category]) {
+          categoryAverages[category] = 0;
+        }
+        categoryAverages[category] += amount;
+      });
+    });
+
+    // Divide by month count to get averages
+    Object.keys(categoryAverages).forEach(category => {
+      categoryAverages[category] /= monthCount;
+    });
+
+    // Calculate total for summary
+    const total = Object.values(categoryAverages).reduce((sum, val) => sum + val, 0);
+    const count = this.projections.filter(p =>
+      this.categoryViewType === 'expense' ? !p.isIncome : p.isIncome
+    ).length;
+
+    this.updateCategorySummary(total, count, 'Average per Month');
+
+    // Sort by amount
+    const sorted = Object.entries(categoryAverages)
+      .sort((a, b) => b[1] - a[1]);
+
+    const labels = sorted.map(([cat]) => `${cat} (avg/month)`);
+    const values = sorted.map(([, amount]) => amount);
+    const colors = sorted.map(([cat]) => this.categorizer.getCategoryColor(cat));
+
+    this.categoryChart.data.labels = labels;
+    this.categoryChart.data.datasets[0].data = values;
+    this.categoryChart.data.datasets[0].backgroundColor = colors;
+    this.categoryChart.update();
+  }
+
+  /**
+   * Update category summary display
+   */
+  updateCategorySummary(total, count, totalLabel = 'Total') {
+    const container = this.categoryChart.canvas.parentElement;
+    let summaryElement = container.querySelector('.category-summary');
+
+    if (!summaryElement) {
+      summaryElement = document.createElement('div');
+      summaryElement.className = 'category-summary';
+      container.insertBefore(summaryElement, this.categoryChart.canvas.nextSibling);
+    }
+
+    if (count === 0) {
+      summaryElement.innerHTML = '';
+      return;
+    }
+
+    const viewLabel = this.categoryViewType === 'expense' ? 'Expenses' : 'Income';
+
+    let summaryHTML = '';
+    if (this.categoryGroupBy === 'all') {
+      const monthlyTotal = total / 12;
+      summaryHTML = `
+        <div class="summary-item">
+          <span class="summary-label">Total Projected ${viewLabel} (12 months):</span>
+          <span class="summary-value">${formatCurrency(total)}</span>
+        </div>
+        <div class="summary-item secondary">
+          <span class="summary-label">Average per month:</span>
+          <span class="summary-value">${formatCurrency(monthlyTotal)}</span>
+        </div>
+      `;
+    } else {
+      summaryHTML = `
+        <div class="summary-item">
+          <span class="summary-label">Average ${viewLabel} per Month:</span>
+          <span class="summary-value">${formatCurrency(total)}</span>
+        </div>
+        <div class="summary-item secondary">
+          <span class="summary-label">Annual (estimated):</span>
+          <span class="summary-value">${formatCurrency(total * 12)}</span>
+        </div>
+      `;
+    }
+
+    summaryElement.innerHTML = `
+      <div class="category-summary-content">
+        ${summaryHTML}
+        <div class="summary-item secondary">
+          <span class="summary-label">Projected Items:</span>
+          <span class="summary-value">${count}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
    * Create recurring chart
    */
   createRecurringChart(canvas) {
+    this.recurringViewType = 'expense'; // 'expense' or 'income'
+    this.setupRecurringTabs(canvas);
+
     this.recurringChart = new Chart(canvas, {
       type: 'bar',
       data: {
@@ -341,6 +557,41 @@ export class FutureChartManager {
   }
 
   /**
+   * Setup recurring tabs for income/expense
+   */
+  setupRecurringTabs(canvas) {
+    const container = canvas.parentElement;
+
+    // Check if tabs already exist
+    if (container.querySelector('.recurring-tabs')) {
+      return;
+    }
+
+    const tabsContainer = document.createElement('div');
+    tabsContainer.className = 'recurring-tabs';
+    tabsContainer.innerHTML = `
+      <button class="recurring-tab active" data-type="expense">Recurring Expenses</button>
+      <button class="recurring-tab" data-type="income">Recurring Income</button>
+    `;
+
+    container.insertBefore(tabsContainer, container.firstChild);
+
+    // Add click handlers
+    const tabs = tabsContainer.querySelectorAll('.recurring-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        // Update active state
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        // Update view type
+        this.recurringViewType = tab.dataset.type;
+        this.updateRecurringChart();
+      });
+    });
+  }
+
+  /**
    * Update recurring chart with projections
    */
   updateRecurringChart() {
@@ -348,8 +599,13 @@ export class FutureChartManager {
 
     const recurringItems = this.projectionService.getRecurringItems();
 
+    // Filter by view type
+    const filteredItems = recurringItems.filter(item =>
+      this.recurringViewType === 'expense' ? !item.isIncome : item.isIncome
+    );
+
     // Calculate monthly cost for each recurring item
-    const items = recurringItems.map(item => {
+    const items = filteredItems.map(item => {
       let monthlyCost = Math.abs(item.amount);
 
       // Convert to monthly based on frequency
@@ -368,22 +624,24 @@ export class FutureChartManager {
       return {
         name: item.name,
         monthlyCost,
+        frequency: item.frequency,
         isIncome: item.isIncome
       };
     });
 
-    // Sort by monthly cost (expenses first, then income)
-    items.sort((a, b) => {
-      if (a.isIncome !== b.isIncome) {
-        return a.isIncome ? 1 : -1; // Expenses first
-      }
-      return b.monthlyCost - a.monthlyCost;
-    });
+    // Sort by monthly cost
+    items.sort((a, b) => b.monthlyCost - a.monthlyCost);
+
+    // Calculate totals for summary
+    const totalMonthlyCost = items.reduce((sum, i) => sum + i.monthlyCost, 0);
+    const totalCount = items.length;
+
+    this.updateRecurringSummary(totalMonthlyCost, totalCount);
 
     // Take top 10
     const top10 = items.slice(0, 10);
 
-    const labels = top10.map(i => i.name);
+    const labels = top10.map(i => `${i.name} (${i.frequency})`);
     const values = top10.map(i => i.monthlyCost);
     const colors = top10.map(i => i.isIncome ? '#4CAF50' : '#2196F3');
 
@@ -391,6 +649,45 @@ export class FutureChartManager {
     this.recurringChart.data.datasets[0].data = values;
     this.recurringChart.data.datasets[0].backgroundColor = colors;
     this.recurringChart.update();
+  }
+
+  /**
+   * Update recurring summary display
+   */
+  updateRecurringSummary(totalMonthlyCost, count) {
+    const container = this.recurringChart.canvas.parentElement;
+    let summaryElement = container.querySelector('.recurring-summary');
+
+    if (!summaryElement) {
+      summaryElement = document.createElement('div');
+      summaryElement.className = 'recurring-summary';
+      container.insertBefore(summaryElement, this.recurringChart.canvas.nextSibling);
+    }
+
+    if (count === 0) {
+      summaryElement.innerHTML = '';
+      return;
+    }
+
+    const annualCost = totalMonthlyCost * 12;
+    const viewLabel = this.recurringViewType === 'expense' ? 'Expenses' : 'Income';
+
+    summaryElement.innerHTML = `
+      <div class="recurring-summary-content">
+        <div class="summary-item">
+          <span class="summary-label">Total Recurring ${viewLabel}:</span>
+          <span class="summary-value">${formatCurrency(totalMonthlyCost)} / month</span>
+        </div>
+        <div class="summary-item secondary">
+          <span class="summary-label">Annual:</span>
+          <span class="summary-value">${formatCurrency(annualCost)} / year</span>
+        </div>
+        <div class="summary-item secondary">
+          <span class="summary-label">Recurring Items:</span>
+          <span class="summary-value">${count}</span>
+        </div>
+      </div>
+    `;
   }
 
   /**

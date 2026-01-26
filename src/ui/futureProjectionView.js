@@ -197,6 +197,29 @@ export class FutureProjectionView {
     const futureRecurringContainer = document.querySelector('#future-recurring-chart').parentElement;
     const futureCategoryContainer = document.querySelector('#future-category-chart').parentElement;
 
+    // Add reload button at the top
+    const futureView = document.getElementById('future-view');
+    if (futureView && !futureView.querySelector('.btn-reload-projections')) {
+      const buttonContainer = document.createElement('div');
+      buttonContainer.className = 'reload-projections-container';
+      buttonContainer.style.cssText = 'display: flex; justify-content: flex-end; margin-bottom: 1rem;';
+
+      const reloadBtn = document.createElement('button');
+      reloadBtn.className = 'btn btn-secondary btn-reload-projections';
+      reloadBtn.innerHTML = '🔄 Reload Projections from Overview';
+      reloadBtn.addEventListener('click', () => {
+        this.reloadProjectionsFromOverview();
+      });
+
+      buttonContainer.appendChild(reloadBtn);
+
+      // Insert at the top of future view, after the section header
+      const summarySection = futureView.querySelector('#future-summary-section');
+      if (summarySection) {
+        futureView.insertBefore(buttonContainer, summarySection);
+      }
+    }
+
     // Add recurring button
     if (futureRecurringContainer && !futureRecurringContainer.querySelector('.btn-add-recurring')) {
       const addRecurringBtn = document.createElement('button');
@@ -222,6 +245,28 @@ export class FutureProjectionView {
         this.showAddOneTimeModal();
       });
     }
+  }
+
+  /**
+   * Reload projections from overview data
+   */
+  async reloadProjectionsFromOverview() {
+    if (!confirm('This will clear all current projections and reload from overview data. Continue?')) {
+      return;
+    }
+
+    console.log('[FutureProjectionView] Reloading projections from overview...');
+
+    // Clear all projections
+    this.projectionService.clearAll();
+
+    // Re-populate from overview
+    await this.autoPopulateFromOverview();
+
+    // Update display
+    this.updateProjection();
+
+    alert('Projections reloaded successfully!');
   }
 
   /**
