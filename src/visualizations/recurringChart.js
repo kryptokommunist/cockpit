@@ -49,6 +49,9 @@ export class RecurringChart {
 
         console.log(`[RecurringChart] Tab clicked - switching to ${this.viewType}`);
 
+        // Update toggle label
+        this.updateToggleLabel();
+
         // Re-render with current data
         if (this.allRecurringData && (this.allRecurringData.expenses || this.allRecurringData.income)) {
           this.update(this.allRecurringData);
@@ -65,26 +68,42 @@ export class RecurringChart {
 
     // Check if toggle already exists
     if (container.querySelector('.recurring-toggle')) {
+      this.toggleContainer = container.querySelector('.recurring-toggle');
       return;
     }
 
-    const toggleContainer = document.createElement('div');
-    toggleContainer.className = 'recurring-toggle';
-    toggleContainer.innerHTML = `
+    this.toggleContainer = document.createElement('div');
+    this.toggleContainer.className = 'recurring-toggle';
+    this.toggleContainer.innerHTML = `
       <label>
         <input type="checkbox" id="recurring-show-all" />
-        Show all recurring costs
+        <span class="toggle-label">Show all recurring costs</span>
       </label>
     `;
 
-    container.insertBefore(toggleContainer, this.canvas);
+    container.insertBefore(this.toggleContainer, this.canvas);
 
-    const checkbox = toggleContainer.querySelector('#recurring-show-all');
+    const checkbox = this.toggleContainer.querySelector('#recurring-show-all');
     checkbox.addEventListener('change', (e) => {
       this.recurringDetector.setFilterMode(e.target.checked ? 'all' : 'recent');
       // Trigger update - needs to be called from parent
       window.dispatchEvent(new CustomEvent('recurring-filter-changed'));
     });
+  }
+
+  /**
+   * Update toggle label based on current view type
+   */
+  updateToggleLabel() {
+    if (this.toggleContainer) {
+      const label = this.toggleContainer.querySelector('.toggle-label');
+      if (label) {
+        const text = this.viewType === 'expense'
+          ? 'Show all recurring costs'
+          : 'Show all recurring income';
+        label.textContent = text;
+      }
+    }
   }
 
   /**
