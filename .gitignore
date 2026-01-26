@@ -1,7 +1,6 @@
 # User data files
 settings.json
-ai-categorization.csv
-recategorization-rules.csv
+*.csv
 
 # Dependencies
 node_modules/

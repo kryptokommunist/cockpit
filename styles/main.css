@@ -43,6 +43,52 @@ header {
   box-shadow: var(--shadow);
 }
 
+/* Main tabs */
+.main-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 2rem;
+  border-bottom: 3px solid var(--border-color);
+  background-color: white;
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+}
+
+.main-tab {
+  flex: 1;
+  background: white;
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.3s;
+  position: relative;
+  bottom: -3px;
+}
+
+.main-tab:hover {
+  background-color: var(--bg-secondary);
+  color: var(--primary-color);
+}
+
+.main-tab.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+  background-color: white;
+}
+
+/* Tab views */
+.tab-view {
+  display: none;
+}
+
+.tab-view.active {
+  display: block;
+}
+
 header h1 {
   font-size: 2rem;
   margin-bottom: 0.5rem;

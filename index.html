@@ -25,6 +25,14 @@
 
       <!-- Dashboard (hidden initially) -->
       <div id="dashboard" class="hidden">
+        <!-- Main tabs -->
+        <div class="main-tabs">
+          <button class="main-tab active" data-view="overview">Overview</button>
+          <button class="main-tab" data-view="future">Future Projection</button>
+        </div>
+
+        <!-- Overview View -->
+        <div id="overview-view" class="tab-view active">
         <!-- Summary Cards -->
         <section id="summary-section" class="summary-grid">
           <div class="summary-card">
@@ -94,6 +102,65 @@
         <section id="settings-section" class="card">
           <div id="settings-container"></div>
         </section>
+        </div>
+        <!-- End Overview View -->
+
+        <!-- Future Projection View -->
+        <div id="future-view" class="tab-view">
+          <!-- Summary Cards -->
+          <section id="future-summary-section" class="summary-grid">
+            <div class="summary-card">
+              <h3>Projected Monthly Income</h3>
+              <p id="future-income" class="summary-value">0,00 €</p>
+            </div>
+            <div class="summary-card">
+              <h3>Projected Monthly Expenses</h3>
+              <p id="future-expenses" class="summary-value">0,00 €</p>
+            </div>
+            <div class="summary-card">
+              <h3>Projected Monthly Balance</h3>
+              <p id="future-balance" class="summary-value">0,00 €</p>
+            </div>
+            <div class="summary-card">
+              <h3>12-Month Projection</h3>
+              <p id="future-total" class="summary-value">0,00 €</p>
+            </div>
+          </section>
+
+          <!-- Future Charts Section -->
+          <section id="future-charts-section">
+            <div class="chart-row">
+              <div class="chart-container card">
+                <h2>Future Timeline (12 Months)</h2>
+                <canvas id="future-timeline-chart"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-row">
+              <div class="chart-container card">
+                <h2>Projected Categories</h2>
+                <canvas id="future-category-chart"></canvas>
+              </div>
+              <div class="chart-container card">
+                <h2>Projected Recurring</h2>
+                <canvas id="future-recurring-chart"></canvas>
+              </div>
+            </div>
+          </section>
+
+          <!-- Budget Calculator Section -->
+          <section id="future-budget-section" class="card">
+            <h2>Budget Projection</h2>
+            <div id="future-budget-container"></div>
+          </section>
+
+          <!-- Financial Q&A Section -->
+          <section id="future-qa-section" class="card">
+            <h2>AI Financial Assistant</h2>
+            <div id="future-qa-container"></div>
+          </section>
+        </div>
+        <!-- End Future View -->
       </div>
     </main>
 

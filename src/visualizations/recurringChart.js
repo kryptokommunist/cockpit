@@ -11,7 +11,48 @@ export class RecurringChart {
     this.chart = null;
     this.recurringDetector = recurringDetector;
     this.allRecurringData = [];
+    this.viewType = 'expense';  // 'expense' or 'income'
+    this.setupTabs();
     this.setupToggle();
+  }
+
+  /**
+   * Setup the expense/income tabs
+   */
+  setupTabs() {
+    const container = this.canvas.parentElement;
+
+    // Check if tabs already exist
+    if (container.querySelector('.recurring-tabs')) {
+      return;
+    }
+
+    const tabsContainer = document.createElement('div');
+    tabsContainer.className = 'recurring-tabs';
+    tabsContainer.innerHTML = `
+      <button class="recurring-tab active" data-type="expense">Recurring Expenses</button>
+      <button class="recurring-tab" data-type="income">Recurring Income</button>
+    `;
+
+    container.insertBefore(tabsContainer, container.firstChild);
+
+    // Add click handlers
+    const tabs = tabsContainer.querySelectorAll('.recurring-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        // Update active state
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        // Update view type
+        this.viewType = tab.dataset.type;
+
+        // Re-render with current data
+        if (this.allRecurringData.length > 0) {
+          this.update(this.allRecurringData);
+        }
+      });
+    });
   }
 
   /**
@@ -46,10 +87,20 @@ export class RecurringChart {
 
   /**
    * Update chart with recurring data
-   * @param {Array<Object>} recurring - Recurring patterns
+   * @param {Object} recurringData - Object with expenses and income arrays
    */
-  update(recurring) {
-    this.allRecurringData = recurring;
+  update(recurringData) {
+    // Handle both old format (array) and new format (object with expenses/income)
+    if (Array.isArray(recurringData)) {
+      this.allRecurringData = { expenses: recurringData, income: [] };
+    } else {
+      this.allRecurringData = recurringData;
+    }
+
+    // Get data for current view type
+    const recurring = this.viewType === 'expense'
+      ? this.allRecurringData.expenses || []
+      : this.allRecurringData.income || [];
 
     if (recurring.length === 0) {
       this.destroy();

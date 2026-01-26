@@ -5,6 +5,7 @@ import { RecurringDetector } from './services/recurringDetector.js';
 import { BudgetCalculator } from './services/budgetCalculator.js';
 import { CategorizationStorage } from './services/categorizationStorage.js';
 import { RecategorizationService } from './services/recategorizationService.js';
+import { ProjectionService } from './services/projectionService.js';
 import { ChartManager } from './visualizations/chartManager.js';
 import { FileUpload } from './ui/fileUpload.js';
 import { TransactionList } from './ui/transactionList.js';
@@ -14,6 +15,7 @@ import { FinancialQA } from './ui/financialQA.js';
 import { TopMerchants } from './ui/topMerchants.js';
 import { SettingsView } from './ui/settingsView.js';
 import { RecategorizeModal } from './ui/recategorizeModal.js';
+import { FutureProjectionView } from './ui/futureProjectionView.js';
 import { formatCurrency } from './utils/numberUtils.js';
 
 /**
@@ -30,6 +32,7 @@ class App {
     this.budgetCalculator = new BudgetCalculator();
     this.categorizationStorage = new CategorizationStorage();
     this.recategorizationService = new RecategorizationService();
+    this.projectionService = new ProjectionService();
     this.chartManager = null;
     this.transactionList = null;
     this.filters = null;
@@ -38,6 +41,7 @@ class App {
     this.topMerchants = null;
     this.settingsView = null;
     this.recategorizeModal = null;
+    this.futureProjectionView = null;
 
     this.init();
   }
@@ -57,8 +61,14 @@ class App {
     // Load recategorization rules
     await this.recategorizationService.load();
 
+    // Load projection data
+    await this.projectionService.load();
+
     // Initialize recategorize modal
     this.recategorizeModal = new RecategorizeModal(this.recategorizationService, this.categorizer);
+
+    // Initialize future projection view
+    this.futureProjectionView = new FutureProjectionView(this.projectionService, this.categorizer);
 
     // Setup event listeners
     this.setupEventListeners();
@@ -133,10 +143,11 @@ class App {
       // Apply filters (initially show all)
       this.filteredTransactions = [...this.transactions];
 
-      // Detect recurring costs
-      console.log('Detecting recurring costs...');
-      const recurring = this.recurringDetector.detect(this.transactions);
-      console.log(`Detected ${recurring.length} recurring costs`);
+      // Detect recurring patterns (expenses and income)
+      console.log('Detecting recurring patterns...');
+      const recurringExpenses = this.recurringDetector.detect(this.transactions, 'expense');
+      const recurringIncome = this.recurringDetector.detect(this.transactions, 'income');
+      console.log(`Detected ${recurringExpenses.length} recurring expenses and ${recurringIncome.length} recurring income`);
 
       // Show dashboard
       this.showDashboard();
@@ -277,7 +288,9 @@ class App {
 
     // Update charts
     if (this.chartManager) {
-      const recurring = this.recurringDetector.detect(this.filteredTransactions);
+      const recurringExpenses = this.recurringDetector.detect(this.filteredTransactions, 'expense');
+      const recurringIncome = this.recurringDetector.detect(this.filteredTransactions, 'income');
+      const recurring = { expenses: recurringExpenses, income: recurringIncome };
       this.chartManager.updateAll(this.filteredTransactions, recurring);
     }
 

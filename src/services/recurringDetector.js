@@ -27,25 +27,14 @@ export class RecurringDetector {
   /**
    * Detect recurring transactions
    * @param {Array<Transaction>} transactions - All transactions
+   * @param {string} type - 'expense', 'income', or 'all'
    * @returns {Array<Object>} - Detected recurring patterns
    */
-  detect(transactions) {
+  detect(transactions, type = 'expense') {
     // Group transactions by normalized merchant
     const merchantGroups = this.groupByMerchant(transactions);
 
-    console.log(`[RecurringDetector] Analyzing ${Object.keys(merchantGroups).length} unique merchants`);
-
-    // Log merchants with many transactions
-    const highOccurrence = Object.entries(merchantGroups)
-      .filter(([_, txs]) => txs.filter(t => t.isExpense()).length >= 5)
-      .sort((a, b) => b[1].length - a[1].length)
-      .slice(0, 10);
-
-    console.log('[RecurringDetector] Top merchants by transaction count:');
-    highOccurrence.forEach(([merchant, txs]) => {
-      const expenses = txs.filter(t => t.isExpense());
-      console.log(`  ${merchant}: ${expenses.length} expenses`);
-    });
+    console.log(`[RecurringDetector] Analyzing ${Object.keys(merchantGroups).length} unique merchants for ${type}`);
 
     const recurring = [];
     const now = new Date();
@@ -56,13 +45,21 @@ export class RecurringDetector {
         continue;
       }
 
-      // Only check expenses (negative amounts)
-      const expenses = merchantTransactions.filter(t => t.isExpense());
-      if (expenses.length < this.minOccurrences) {
+      // Filter by type
+      let filteredTransactions;
+      if (type === 'expense') {
+        filteredTransactions = merchantTransactions.filter(t => t.isExpense());
+      } else if (type === 'income') {
+        filteredTransactions = merchantTransactions.filter(t => t.isIncome());
+      } else {
+        filteredTransactions = merchantTransactions;
+      }
+
+      if (filteredTransactions.length < this.minOccurrences) {
         continue;
       }
 
-      const pattern = this.analyzePattern(merchant, expenses);
+      const pattern = this.analyzePattern(merchant, filteredTransactions, type);
       if (pattern) {
         // Filter by time period if in 'recent' mode
         if (this.filterMode === 'recent') {
@@ -75,7 +72,7 @@ export class RecurringDetector {
       }
     }
 
-    console.log(`[RecurringDetector] Detected ${recurring.length} recurring patterns`);
+    console.log(`[RecurringDetector] Detected ${recurring.length} recurring ${type} patterns`);
 
     // Sort by monthly cost (highest first)
     recurring.sort((a, b) => b.monthlyCost - a.monthlyCost);
@@ -142,9 +139,10 @@ export class RecurringDetector {
    * Analyze transaction pattern for a merchant
    * @param {string} merchant - Merchant name
    * @param {Array<Transaction>} transactions - Merchant transactions
+   * @param {string} type - 'expense' or 'income'
    * @returns {Object|null} - Pattern object or null
    */
-  analyzePattern(merchant, transactions) {
+  analyzePattern(merchant, transactions, type = 'expense') {
     const debug = merchant.toLowerCase().includes('miete') ||
                   merchant.toLowerCase().includes('rent') ||
                   transactions.length >= 10; // Debug high-occurrence merchants
