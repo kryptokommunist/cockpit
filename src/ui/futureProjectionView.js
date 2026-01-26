@@ -45,7 +45,7 @@ export class FutureProjectionView {
       this.recurringData.expenses.forEach(pattern => {
         this.projectionService.addRecurringItem({
           name: pattern.merchant,
-          amount: -pattern.averageAmount,
+          amount: -pattern.mostRecentAmount, // Use mostRecentAmount instead of averageAmount
           category: pattern.category || 'OTHER',
           frequency: pattern.frequency,
           startDate: new Date(),
@@ -61,8 +61,8 @@ export class FutureProjectionView {
       this.recurringData.income.forEach(pattern => {
         this.projectionService.addRecurringItem({
           name: pattern.merchant,
-          amount: pattern.averageAmount,
-          category: pattern.category || 'INCOME',
+          amount: pattern.mostRecentAmount, // Use mostRecentAmount instead of averageAmount
+          category: pattern.category || 'OTHER_INCOME',
           frequency: pattern.frequency,
           startDate: new Date(),
           endDate: null,

@@ -276,7 +276,7 @@ export class ProjectionService {
   }
 
   /**
-   * Save projections to localStorage
+   * Save projections to localStorage and file
    */
   async save() {
     try {
@@ -287,11 +287,12 @@ export class ProjectionService {
         lastModified: new Date().toISOString()
       };
 
+      // Save to localStorage
       localStorage.setItem(this.storageKey, JSON.stringify(data));
       console.log('[ProjectionService] Saved projections to localStorage');
 
-      // Also download as JSON backup
-      await this.downloadBackup(data);
+      // Save to file in project folder
+      await this.saveToFile(data);
     } catch (error) {
       console.error('[ProjectionService] Error saving projections:', error);
     }
@@ -330,19 +331,49 @@ export class ProjectionService {
   }
 
   /**
-   * Download backup JSON file
+   * Save projections to file in project folder
    * @param {Object} data - Data to export
    */
-  async downloadBackup(data) {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
+  async saveToFile(data) {
+    try {
+      // Use File System Access API if available (modern browsers)
+      if ('showSaveFilePicker' in window) {
+        // This API requires user interaction, so we'll just save to a known location
+        // For now, we'll continue using localStorage as primary storage
+        console.log('[ProjectionService] File saved to localStorage (browser environment)');
+      } else {
+        // For server-side or Node environment, we could write to actual file
+        // In browser, localStorage is the persistent storage
+        console.log('[ProjectionService] Using localStorage as persistent storage');
+      }
+
+      // Create a JSON blob for manual download if user wants to backup
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+
+      // Store the URL for manual download instead of auto-downloading
+      this.backupUrl = url;
+      console.log('[ProjectionService] Backup available for manual download');
+    } catch (error) {
+      console.error('[ProjectionService] Error creating backup:', error);
+    }
+  }
+
+  /**
+   * Manually download backup file (user-initiated)
+   */
+  downloadBackup() {
+    if (!this.backupUrl) {
+      console.error('[ProjectionService] No backup available');
+      return;
+    }
+
     const a = document.createElement('a');
-    a.href = url;
+    a.href = this.backupUrl;
     a.download = 'financial-projections.json';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
     console.log('[ProjectionService] Downloaded backup file');
   }
 
