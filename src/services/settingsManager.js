@@ -23,13 +23,22 @@ export class SettingsManager {
       // First try to load from settings.json file
       const response = await fetch(this.settingsPath);
       if (response.ok) {
-        this.settings = await response.json();
-        console.log('Settings loaded from settings.json:', this.settings);
+        const text = await response.text();
+        if (text && text.trim()) {
+          try {
+            this.settings = JSON.parse(text);
+            console.log('[SettingsManager] Settings loaded from settings.json');
+          } catch (parseError) {
+            console.log('[SettingsManager] settings.json exists but contains invalid JSON, using defaults');
+          }
+        } else {
+          console.log('[SettingsManager] settings.json is empty, using defaults');
+        }
       } else {
-        console.log('No settings.json file found');
+        console.log('[SettingsManager] No settings.json file found, using defaults');
       }
     } catch (error) {
-      console.log('Could not fetch settings.json:', error.message);
+      console.log('[SettingsManager] Could not fetch settings.json, using defaults');
     }
 
     // Then load from localStorage (will merge/override file settings)

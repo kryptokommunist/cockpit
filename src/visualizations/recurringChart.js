@@ -47,8 +47,10 @@ export class RecurringChart {
         // Update view type
         this.viewType = tab.dataset.type;
 
+        console.log(`[RecurringChart] Tab clicked - switching to ${this.viewType}`);
+
         // Re-render with current data
-        if (this.allRecurringData.length > 0) {
+        if (this.allRecurringData && (this.allRecurringData.expenses || this.allRecurringData.income)) {
           this.update(this.allRecurringData);
         }
       });
