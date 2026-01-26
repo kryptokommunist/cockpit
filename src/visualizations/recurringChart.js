@@ -147,11 +147,12 @@ export class RecurringChart {
     }
 
     const annualCost = totalMonthlyCost * 12;
+    const viewLabel = this.viewType === 'expense' ? 'Costs' : 'Income';
 
     summaryElement.innerHTML = `
       <div class="recurring-summary-content">
         <div class="summary-item">
-          <span class="summary-label">Total Recurring Costs:</span>
+          <span class="summary-label">Total Recurring ${viewLabel}:</span>
           <span class="summary-value">${formatCurrency(totalMonthlyCost)} / month</span>
         </div>
         <div class="summary-item secondary">
@@ -194,17 +195,27 @@ export class RecurringChart {
     // Always show monthly cost (normalized)
     const values = top10.map(r => r.monthlyCost);
 
-    // Color based on confidence
+    // Color based on confidence and type (expense/income)
     const colors = top10.map(r => {
-      if (r.confidence >= 0.8) return 'rgba(76, 175, 80, 0.7)'; // High confidence - green
-      if (r.confidence >= 0.6) return 'rgba(255, 152, 0, 0.7)'; // Medium - orange
-      return 'rgba(244, 67, 54, 0.7)'; // Low - red
+      if (this.viewType === 'income') {
+        // Income: green shades based on confidence
+        if (r.confidence >= 0.8) return 'rgba(76, 175, 80, 0.7)'; // High confidence - dark green
+        if (r.confidence >= 0.6) return 'rgba(129, 199, 132, 0.7)'; // Medium - medium green
+        return 'rgba(165, 214, 167, 0.7)'; // Low - light green
+      } else {
+        // Expenses: varied colors based on confidence
+        if (r.confidence >= 0.8) return 'rgba(33, 150, 243, 0.7)'; // High confidence - blue
+        if (r.confidence >= 0.6) return 'rgba(255, 152, 0, 0.7)'; // Medium - orange
+        return 'rgba(244, 67, 54, 0.7)'; // Low - red
+      }
     });
+
+    const datasetLabel = this.viewType === 'income' ? 'Monthly Income' : 'Monthly Cost';
 
     return {
       labels,
       datasets: [{
-        label: 'Monthly Cost',
+        label: datasetLabel,
         data: values,
         backgroundColor: colors,
         borderColor: colors.map(c => c.replace('0.7', '1')),
