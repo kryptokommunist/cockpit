@@ -13,6 +13,7 @@ import { TransactionList } from './ui/transactionList.js';
 import { Filters } from './ui/filters.js';
 import { BudgetView } from './ui/budgetView.js';
 import { FinancialQA } from './ui/financialQA.js';
+import { FutureFinancialQA } from './ui/futureFinancialQA.js';
 import { TopMerchants } from './ui/topMerchants.js';
 import { SettingsView } from './ui/settingsView.js';
 import { RecategorizeModal } from './ui/recategorizeModal.js';
@@ -40,6 +41,7 @@ class App {
     this.filters = null;
     this.budgetView = null;
     this.financialQA = null;
+    this.futureFinancialQA = null;
     this.topMerchants = null;
     this.settingsView = null;
     this.recategorizeModal = null;
@@ -238,6 +240,13 @@ class App {
     );
     // Pass categorizer reference for dynamic category management
     this.financialQA.categorizer = this.categorizer;
+
+    // Initialize future financial Q&A
+    const futureQAContainer = document.getElementById('future-qa-container');
+    this.futureFinancialQA = new FutureFinancialQA(
+      futureQAContainer,
+      this.projectionService
+    );
 
     // Initialize settings view
     const settingsContainer = document.getElementById('settings-container');

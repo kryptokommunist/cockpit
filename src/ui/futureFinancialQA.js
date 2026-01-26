@@ -53,14 +53,14 @@ export class FutureFinancialQA {
           <button class="qa-tab active" data-tab="chat">Chat</button>
           <button class="qa-tab" data-tab="debug">Debug</button>
           <div class="qa-history-indicator">
-            <span id="future-qa-history-count">0 messages</span> in context
-            <button id="future-clear-context-btn" class="btn-clear-context" title="Clear conversation context">×</button>
+            <span id="future-future-qa-history-count">0 messages</span> in context
+            <button id="future-future-clear-context-btn" class="btn-clear-context" title="Clear conversation context">×</button>
           </div>
         </div>
 
         <div class="qa-tab-content">
           <div class="qa-tab-panel active" id="future-qa-tab-chat">
-            <div class="qa-conversation" id="future-qa-conversation">
+            <div class="future-qa-conversation" id="future-future-qa-conversation">
               <div class="qa-welcome">
                 <p><strong>Welcome to your AI Future Projection Assistant!</strong></p>
                 <p>I can analyze your future projections and answer questions like:</p>
@@ -77,7 +77,7 @@ export class FutureFinancialQA {
           </div>
 
           <div class="qa-tab-panel" id="future-qa-tab-debug">
-            <div class="qa-debug" id="future-qa-debug">
+            <div class="future-qa-debug" id="future-future-qa-debug">
               <div class="debug-welcome">
                 <p>Debug view - Shows all agent interactions</p>
                 <p>Tool calls, inputs, and outputs will appear here as the agent works.</p>
@@ -86,9 +86,9 @@ export class FutureFinancialQA {
           </div>
         </div>
 
-        <div class="qa-input-container">
-          <input type="text" id="future-qa-input" placeholder="Ask a question about your future projections..." />
-          <button id="future-qa-send-btn" class="btn btn-primary">Send</button>
+        <div class="future-qa-input-container">
+          <input type="text" id="future-future-qa-input" placeholder="Ask a question about your future projections..." />
+          <button id="future-future-qa-send-btn" class="btn btn-primary">Send</button>
         </div>
       </div>
     `;
@@ -97,10 +97,9 @@ export class FutureFinancialQA {
   }
 
   attachEventListeners() {
-    const input = this.container.querySelector('#qa-input');
-    const sendBtn = this.container.querySelector('#qa-send-btn');
+    const input = this.container.querySelector('#future-qa-input');
+    const sendBtn = this.container.querySelector('#future-qa-send-btn');
     const quickButtons = this.container.querySelectorAll('.btn-quick');
-    const aiCategorizeBtn = this.container.querySelector('#ai-categorize-btn');
     const tabs = this.container.querySelectorAll('.qa-tab');
 
     sendBtn.addEventListener('click', () => this.handleSendMessage());
@@ -117,7 +116,6 @@ export class FutureFinancialQA {
       });
     });
 
-    aiCategorizeBtn.addEventListener('click', () => this.handleAICategorization());
 
     // Tab switching
     tabs.forEach(tab => {
@@ -128,7 +126,7 @@ export class FutureFinancialQA {
     });
 
     // Clear context button
-    const clearContextBtn = this.container.querySelector('#clear-context-btn');
+    const clearContextBtn = this.container.querySelector('#future-clear-context-btn');
     if (clearContextBtn) {
       clearContextBtn.addEventListener('click', () => this.clearContext());
     }
@@ -140,10 +138,10 @@ export class FutureFinancialQA {
     if (confirm(`Clear conversation context? (${this.conversationHistory.length} messages will be removed)`)) {
       this.conversationHistory = [];
       this.updateHistoryIndicator();
-      console.log('[FinancialQA] Conversation context cleared');
+      console.log('[FutureFinancialQA] Conversation context cleared');
 
       // Show notification in chat
-      const conversation = this.container.querySelector('#qa-conversation');
+      const conversation = this.container.querySelector('#future-qa-conversation');
       const notice = document.createElement('div');
       notice.className = 'qa-context-notice';
       notice.textContent = '🔄 Conversation context cleared. Starting fresh conversation.';
@@ -175,7 +173,7 @@ export class FutureFinancialQA {
   }
 
   async handleSendMessage() {
-    const input = this.container.querySelector('#qa-input');
+    const input = this.container.querySelector('#future-qa-input');
     const question = input.value.trim();
 
     if (!question) return;
@@ -230,7 +228,7 @@ export class FutureFinancialQA {
         timestamp: new Date()
       });
 
-      console.log(`[FinancialQA] Added to history. Summary: "${summary.substring(0, 100)}..."`);
+      console.log(`[FutureFinancialQA] Added to history. Summary: "${summary.substring(0, 100)}..."`);
 
       // Update history indicator
       this.updateHistoryIndicator();
@@ -245,7 +243,7 @@ export class FutureFinancialQA {
   }
 
   addThinkingIndicator() {
-    const conversation = this.container.querySelector('#qa-conversation');
+    const conversation = this.container.querySelector('#future-qa-conversation');
     const thinkingId = `thinking-${Date.now()}`;
 
     const thinkingDiv = document.createElement('div');
@@ -287,12 +285,12 @@ export class FutureFinancialQA {
     stepsContainer.appendChild(stepDiv);
 
     // Scroll to bottom
-    const conversation = this.container.querySelector('#qa-conversation');
+    const conversation = this.container.querySelector('#future-qa-conversation');
     conversation.scrollTop = conversation.scrollHeight;
   }
 
   addStreamingMessage() {
-    const conversation = this.container.querySelector('#qa-conversation');
+    const conversation = this.container.querySelector('#future-qa-conversation');
     const messageId = `msg-${Date.now()}-${Math.random().toString().replace('.', '')}`;
 
     const messageDiv = document.createElement('div');
@@ -338,7 +336,7 @@ export class FutureFinancialQA {
     }
 
     // Scroll to bottom
-    const conversation = this.container.querySelector('#qa-conversation');
+    const conversation = this.container.querySelector('#future-qa-conversation');
     conversation.scrollTop = conversation.scrollHeight;
   }
 
@@ -367,7 +365,7 @@ export class FutureFinancialQA {
   }
 
   addDebugEntry(type, content, input = null, result = null) {
-    const debugContainer = this.container.querySelector('#qa-debug');
+    const debugContainer = this.container.querySelector('#future-qa-debug');
     if (!debugContainer) return;
 
     const entryDiv = document.createElement('div');
@@ -438,7 +436,7 @@ export class FutureFinancialQA {
   }
 
   updateHistoryIndicator() {
-    const indicator = this.container.querySelector('#qa-history-count');
+    const indicator = this.container.querySelector('#future-qa-history-count');
     if (!indicator) return;
 
     const count = this.conversationHistory.length;
@@ -465,16 +463,13 @@ export class FutureFinancialQA {
 
     const question = questions[action];
     if (question) {
-      const input = this.container.querySelector('#qa-input');
+      const input = this.container.querySelector('#future-qa-input');
       input.value = question;
       await this.handleSendMessage();
     }
   }
 
-  async handleAICategorization() {
-    console.log('[FinancialQA] AI Categorization started');
-    const btn = this.container.querySelector('#ai-categorize-btn');
-    const progressContainer = this.container.querySelector('#ai-categorize-progress');
+    console.log('[FutureFinancialQA] AI Categorization started');
     const progressFill = this.container.querySelector('#categorize-progress-fill');
     const progressText = this.container.querySelector('#categorize-progress-text');
 
@@ -486,7 +481,7 @@ export class FutureFinancialQA {
     try {
       // Process all transactions (will recategorize already categorized ones)
       const transactionsToCategorize = this.transactions;
-      console.log('[FinancialQA] Found', transactionsToCategorize.length, 'transactions to categorize');
+      console.log('[FutureFinancialQA] Found', transactionsToCategorize.length, 'transactions to categorize');
 
       if (transactionsToCategorize.length === 0) {
         alert('No transactions to categorize!');
@@ -499,7 +494,7 @@ export class FutureFinancialQA {
 
       // Get existing categories from transactions
       const existingCategories = [...new Set(this.transactions.map(t => t.category))].filter(Boolean);
-      console.log('[FinancialQA] Existing categories:', existingCategories);
+      console.log('[FutureFinancialQA] Existing categories:', existingCategories);
 
       // Initialize progress display
       progressText.textContent = `Starting batch categorization...`;
@@ -507,13 +502,13 @@ export class FutureFinancialQA {
       progressFill.style.animation = 'none';
 
       const onProgress = (current, total, batch, totalBatches) => {
-        console.log('[FinancialQA] Progress: Batch', batch, '/', totalBatches, '-', current, '/', total);
+        console.log('[FutureFinancialQA] Progress: Batch', batch, '/', totalBatches, '-', current, '/', total);
         const percentage = (current / total) * 100;
         progressFill.style.width = `${percentage}%`;
         progressText.textContent = `Batch ${batch}/${totalBatches}: ${current} / ${total} transactions (${percentage.toFixed(0)}%)`;
       };
 
-      console.log('[FinancialQA] Calling batchCategorize with existing categories...');
+      console.log('[FutureFinancialQA] Calling batchCategorize with existing categories...');
 
       // Batch categorize with existing categories
       const { results, newCategories } = await this.llmService.batchCategorize(
@@ -521,11 +516,11 @@ export class FutureFinancialQA {
         existingCategories,
         onProgress
       );
-      console.log('[FinancialQA] Got results:', results.size, 'categorized');
-      console.log('[FinancialQA] New categories discovered:', newCategories);
+      console.log('[FutureFinancialQA] Got results:', results.size, 'categorized');
+      console.log('[FutureFinancialQA] New categories discovered:', newCategories);
 
       // Apply categories
-      console.log('[FinancialQA] Applying categories to transactions...');
+      console.log('[FutureFinancialQA] Applying categories to transactions...');
       let appliedCount = 0;
       results.forEach((category, transactionId) => {
         const transaction = this.transactions.find(t => t.id === transactionId);
@@ -533,10 +528,10 @@ export class FutureFinancialQA {
           transaction.category = category;
           appliedCount++;
         } else {
-          console.warn('[FinancialQA] Could not find transaction with ID:', transactionId);
+          console.warn('[FutureFinancialQA] Could not find transaction with ID:', transactionId);
         }
       });
-      console.log('[FinancialQA] Applied', appliedCount, 'categories');
+      console.log('[FutureFinancialQA] Applied', appliedCount, 'categories');
 
       // Dispatch event with new categories for saving
       if (newCategories && newCategories.length > 0) {
@@ -546,13 +541,11 @@ export class FutureFinancialQA {
       }
 
       // Save categorizations to storage
-      console.log('[FinancialQA] Saving categorizations...');
-      if (this.categorizationStorage) {
+      console.log('[FutureFinancialQA] Saving categorizations...');
         try {
-          await this.categorizationStorage.save(results);
-          console.log('[FinancialQA] Categorizations saved successfully');
+          console.log('[FutureFinancialQA] Categorizations saved successfully');
         } catch (saveError) {
-          console.error('[FinancialQA] Error saving categorizations:', saveError);
+          console.error('[FutureFinancialQA] Error saving categorizations:', saveError);
         }
       }
 
@@ -567,7 +560,7 @@ export class FutureFinancialQA {
       // Trigger app update (would need to be passed from parent)
       window.dispatchEvent(new CustomEvent('transactions-updated'));
     } catch (error) {
-      console.error('[FinancialQA] Error during categorization:', error);
+      console.error('[FutureFinancialQA] Error during categorization:', error);
       this.showError(`Error during AI categorization: ${error.message}`);
     } finally {
       // Reset UI
@@ -578,7 +571,7 @@ export class FutureFinancialQA {
   }
 
   addMessage(role, content, isLoading = false, isError = false) {
-    const conversation = this.container.querySelector('#qa-conversation');
+    const conversation = this.container.querySelector('#future-qa-conversation');
     const messageId = `msg-${Date.now()}-${Math.random().toString().replace('.', '')}`;
 
     const messageDiv = document.createElement('div');
@@ -801,7 +794,7 @@ export class FutureFinancialQA {
   }
 
   showWarning(message) {
-    const conversation = this.container.querySelector('#qa-conversation');
+    const conversation = this.container.querySelector('#future-qa-conversation');
     const warning = document.createElement('div');
     warning.className = 'qa-warning';
     warning.textContent = message;
