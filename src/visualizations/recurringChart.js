@@ -97,10 +97,14 @@ export class RecurringChart {
       this.allRecurringData = recurringData;
     }
 
+    console.log(`[RecurringChart] Update called - viewType: ${this.viewType}, expenses: ${this.allRecurringData.expenses?.length || 0}, income: ${this.allRecurringData.income?.length || 0}`);
+
     // Get data for current view type
     const recurring = this.viewType === 'expense'
       ? this.allRecurringData.expenses || []
       : this.allRecurringData.income || [];
+
+    console.log(`[RecurringChart] Showing ${recurring.length} ${this.viewType} items`);
 
     if (recurring.length === 0) {
       this.destroy();
@@ -305,13 +309,17 @@ export class RecurringChart {
     const container = this.canvas.parentElement;
     let emptyState = container.querySelector('.empty-state');
 
+    const message = this.viewType === 'expense'
+      ? 'No recurring costs detected'
+      : 'No recurring income detected';
+
     if (!emptyState) {
       emptyState = document.createElement('div');
       emptyState.className = 'empty-state';
-      emptyState.innerHTML = '<p>No recurring costs detected</p>';
       container.appendChild(emptyState);
     }
 
+    emptyState.innerHTML = `<p>${message}</p>`;
     this.canvas.style.display = 'none';
     emptyState.style.display = 'block';
   }
