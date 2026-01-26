@@ -7,6 +7,7 @@ import { CategorizationStorage } from './services/categorizationStorage.js';
 import { RecategorizationService } from './services/recategorizationService.js';
 import { ProjectionService } from './services/projectionService.js';
 import { ChartManager } from './visualizations/chartManager.js';
+import { FutureChartManager } from './visualizations/futureChartManager.js';
 import { FileUpload } from './ui/fileUpload.js';
 import { TransactionList } from './ui/transactionList.js';
 import { Filters } from './ui/filters.js';
@@ -34,6 +35,7 @@ class App {
     this.recategorizationService = new RecategorizationService();
     this.projectionService = new ProjectionService();
     this.chartManager = null;
+    this.futureChartManager = null;
     this.transactionList = null;
     this.filters = null;
     this.budgetView = null;
@@ -69,6 +71,9 @@ class App {
 
     // Initialize future projection view
     this.futureProjectionView = new FutureProjectionView(this.projectionService, this.categorizer);
+
+    // Initialize future chart manager
+    this.futureChartManager = new FutureChartManager(this.projectionService, this.categorizer);
 
     // Setup event listeners
     this.setupEventListeners();

@@ -2038,3 +2038,71 @@
   padding: 2rem;
   font-style: italic;
 }
+
+/* Monthly Overrides */
+#monthly-overrides-section h4 {
+  margin: 1rem 0 0.5rem 0;
+  color: var(--text-primary);
+}
+
+.monthly-overrides-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.monthly-override-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.monthly-override-item label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.monthly-override-input {
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.monthly-override-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+}
+
+/* Sparkline Graph */
+.projection-item.has-overrides {
+  background: linear-gradient(135deg, rgba(33, 150, 243, 0.05) 0%, rgba(255, 255, 255, 0) 100%);
+}
+
+.sparkline-container {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sparkline {
+  color: var(--primary-color);
+}
+
+.projection-item.income .sparkline {
+  color: var(--success-color);
+}
+
+.projection-item.expense .sparkline {
+  color: var(--danger-color);
+}
+
+.sparkline-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}

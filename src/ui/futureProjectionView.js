@@ -22,6 +22,10 @@ export class FutureProjectionView {
   setTransactionData(transactions, recurringData) {
     this.transactions = transactions;
     this.recurringData = recurringData;
+
+    // Calculate current balance
+    this.currentBalance = transactions.reduce((sum, t) => sum + t.amount, 0);
+    console.log(`[FutureProjectionView] Current balance: €${this.currentBalance.toFixed(2)}`);
   }
 
   /**
@@ -255,7 +259,12 @@ export class FutureProjectionView {
 
     // Dispatch event to update charts
     window.dispatchEvent(new CustomEvent('update-future-projection', {
-      detail: { projections, startDate, endDate }
+      detail: {
+        projections,
+        startDate,
+        endDate,
+        startingBalance: this.currentBalance || 0
+      }
     }));
   }
 
@@ -336,13 +345,17 @@ export class FutureProjectionView {
    * Render recurring item
    */
   renderRecurringItem(item) {
+    const hasOverrides = item.monthlyOverrides && Object.keys(item.monthlyOverrides).length > 0;
+    const sparkline = hasOverrides ? this.renderSparkline(item) : '';
+
     return `
-      <div class="projection-item ${item.isIncome ? 'income' : 'expense'}">
+      <div class="projection-item ${item.isIncome ? 'income' : 'expense'} ${hasOverrides ? 'has-overrides' : ''}">
         <div class="item-info">
           <div class="item-name">${item.name}</div>
           <div class="item-details">
             ${formatCurrency(Math.abs(item.amount))} · ${item.frequency} · ${item.category}
           </div>
+          ${sparkline}
         </div>
         <div class="item-actions">
           <button class="btn-icon btn-edit-item" data-item-id="${item.id}" data-item-type="recurring" title="Edit">
@@ -352,6 +365,64 @@ export class FutureProjectionView {
             🗑️
           </button>
         </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Render sparkline graph for item with overrides
+   */
+  renderSparkline(item) {
+    const startDate = new Date();
+    const values = [];
+    const baseAmount = Math.abs(item.amount);
+
+    // Get values for next 12 months
+    for (let i = 0; i < 12; i++) {
+      const month = addMonths(startDate, i);
+      const monthKey = format(month, 'yyyy-MM');
+
+      const amount = item.monthlyOverrides && item.monthlyOverrides[monthKey]
+        ? Math.abs(item.monthlyOverrides[monthKey])
+        : baseAmount;
+
+      values.push(amount);
+    }
+
+    // Calculate min/max for scaling
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const range = max - min || 1;
+
+    // Generate SVG path
+    const width = 200;
+    const height = 40;
+    const padding = 2;
+
+    const points = values.map((value, index) => {
+      const x = (index / (values.length - 1)) * (width - 2 * padding) + padding;
+      const y = height - padding - ((value - min) / range) * (height - 2 * padding);
+      return `${x},${y}`;
+    }).join(' ');
+
+    return `
+      <div class="sparkline-container">
+        <svg class="sparkline" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+          <polyline
+            points="${points}"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+          ${values.map((value, index) => {
+            const x = (index / (values.length - 1)) * (width - 2 * padding) + padding;
+            const y = height - padding - ((value - min) / range) * (height - 2 * padding);
+            return `<circle cx="${x}" cy="${y}" r="2" fill="currentColor"/>`;
+          }).join('')}
+        </svg>
+        <span class="sparkline-label">12-month variation</span>
       </div>
     `;
   }
@@ -453,11 +524,38 @@ export class FutureProjectionView {
         <input type="date" name="endDate" value="${item.endDate ? format(new Date(item.endDate), 'yyyy-MM-dd') : ''}">
       </div>
 
+      <div class="form-group">
+        <label>
+          <input type="checkbox" id="enable-monthly-overrides" ${item.monthlyOverrides && Object.keys(item.monthlyOverrides).length > 0 ? 'checked' : ''}>
+          Set individual amounts for each month
+        </label>
+      </div>
+
+      <div id="monthly-overrides-section" style="display: none;">
+        <h4>Monthly Amounts</h4>
+        <div class="monthly-overrides-grid">
+          ${this.renderMonthlyOverrides(item)}
+        </div>
+      </div>
+
       <div class="form-actions">
         <button type="button" class="btn btn-secondary btn-cancel">Cancel</button>
         <button type="submit" class="btn btn-primary">Update Item</button>
       </div>
     `;
+
+    // Setup monthly overrides toggle
+    const checkbox = form.querySelector('#enable-monthly-overrides');
+    const overridesSection = form.querySelector('#monthly-overrides-section');
+
+    checkbox.addEventListener('change', () => {
+      overridesSection.style.display = checkbox.checked ? 'block' : 'none';
+    });
+
+    // Show if already has overrides
+    if (checkbox.checked) {
+      overridesSection.style.display = 'block';
+    }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -472,6 +570,25 @@ export class FutureProjectionView {
         endDate: formData.get('endDate') ? new Date(formData.get('endDate')) : null,
         isIncome: formData.get('type') === 'income'
       };
+
+      // Collect monthly overrides if enabled
+      if (checkbox.checked) {
+        const monthlyOverrides = {};
+        const overrideInputs = form.querySelectorAll('.monthly-override-input');
+
+        overrideInputs.forEach(input => {
+          const month = input.dataset.month;
+          const value = parseFloat(input.value);
+
+          if (!isNaN(value) && value !== Math.abs(item.amount)) {
+            monthlyOverrides[month] = value * (formData.get('type') === 'expense' ? -1 : 1);
+          }
+        });
+
+        updates.monthlyOverrides = monthlyOverrides;
+      } else {
+        updates.monthlyOverrides = {};
+      }
 
       this.projectionService.updateRecurringItem(item.id, updates);
       await this.projectionService.save();
@@ -731,6 +848,41 @@ export class FutureProjectionView {
     modal.querySelector('.modal-body').appendChild(form);
     document.body.appendChild(modal);
     setTimeout(() => modal.classList.add('show'), 10);
+  }
+
+  /**
+   * Render monthly overrides for next 12 months
+   */
+  renderMonthlyOverrides(item) {
+    const startDate = new Date();
+    const months = [];
+
+    for (let i = 0; i < 12; i++) {
+      const month = addMonths(startDate, i);
+      const monthKey = format(month, 'yyyy-MM');
+      const monthLabel = format(month, 'MMM yyyy');
+
+      const defaultAmount = Math.abs(item.amount);
+      const overrideAmount = item.monthlyOverrides && item.monthlyOverrides[monthKey]
+        ? Math.abs(item.monthlyOverrides[monthKey])
+        : defaultAmount;
+
+      months.push(`
+        <div class="monthly-override-item">
+          <label>${monthLabel}</label>
+          <input
+            type="number"
+            class="monthly-override-input"
+            data-month="${monthKey}"
+            step="0.01"
+            value="${overrideAmount.toFixed(2)}"
+            placeholder="${defaultAmount.toFixed(2)}"
+          />
+        </div>
+      `);
+    }
+
+    return months.join('');
   }
 
   /**
