@@ -61,7 +61,7 @@ export class FutureChartManager {
   }
 
   /**
-   * Create timeline chart
+   * Create timeline chart (bars for income/expenses, line for balance)
    */
   createTimelineChart(canvas) {
     const startDate = new Date();
@@ -73,36 +73,39 @@ export class FutureChartManager {
     const labels = months.map(d => format(d, 'MMM yyyy'));
 
     this.timelineChart = new Chart(canvas, {
-      type: 'line',
+      type: 'bar',
       data: {
         labels: labels,
         datasets: [
           {
             label: 'Projected Income',
             data: new Array(12).fill(0),
+            backgroundColor: 'rgba(76, 175, 80, 0.7)',
             borderColor: '#4CAF50',
-            backgroundColor: 'rgba(76, 175, 80, 0.1)',
-            borderWidth: 2,
-            tension: 0.4,
-            fill: true
+            borderWidth: 1,
+            type: 'bar',
+            order: 2
           },
           {
             label: 'Projected Expenses',
             data: new Array(12).fill(0),
+            backgroundColor: 'rgba(244, 67, 54, 0.7)',
             borderColor: '#F44336',
-            backgroundColor: 'rgba(244, 67, 54, 0.1)',
-            borderWidth: 2,
-            tension: 0.4,
-            fill: true
+            borderWidth: 1,
+            type: 'bar',
+            order: 2
           },
           {
-            label: 'Projected Balance',
+            label: 'Cumulative Balance',
             data: new Array(12).fill(0),
             borderColor: '#2196F3',
             backgroundColor: 'rgba(33, 150, 243, 0.1)',
             borderWidth: 3,
             tension: 0.4,
-            fill: false
+            fill: true,
+            type: 'line',
+            order: 1,
+            yAxisID: 'y1'
           }
         ]
       },
@@ -110,6 +113,10 @@ export class FutureChartManager {
         responsive: true,
         maintainAspectRatio: true,
         aspectRatio: 2.5,
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
         plugins: {
           legend: {
             display: true,
@@ -126,12 +133,39 @@ export class FutureChartManager {
           }
         },
         scales: {
+          x: {
+            stacked: false
+          },
           y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
             beginAtZero: true,
+            title: {
+              display: true,
+              text: 'Monthly Income/Expenses'
+            },
             ticks: {
               callback: function(value) {
                 return formatCurrency(value);
               }
+            }
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            title: {
+              display: true,
+              text: 'Cumulative Balance'
+            },
+            ticks: {
+              callback: function(value) {
+                return formatCurrency(value);
+              }
+            },
+            grid: {
+              drawOnChartArea: false
             }
           }
         }
