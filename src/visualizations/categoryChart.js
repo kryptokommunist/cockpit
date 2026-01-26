@@ -15,8 +15,24 @@ export class CategoryChart {
     this.timePeriod = 'all'; // 'all', 'last7days', 'last30days', 'last3months', 'last6months', 'lastyear'
     this.viewType = 'expense'; // 'expense' or 'income'
     this.allTransactions = [];
+    this.recurringMerchants = new Set(); // Set of recurring merchant names to exclude
     this.setupTabs();
     this.setupSelectors();
+  }
+
+  /**
+   * Set recurring merchants to exclude from category breakdown
+   * @param {Array} recurringPatterns - Recurring expense/income patterns
+   */
+  setRecurringMerchants(recurringPatterns) {
+    this.recurringMerchants.clear();
+    if (recurringPatterns && recurringPatterns.expenses) {
+      recurringPatterns.expenses.forEach(p => this.recurringMerchants.add(p.merchant));
+    }
+    if (recurringPatterns && recurringPatterns.income) {
+      recurringPatterns.income.forEach(p => this.recurringMerchants.add(p.merchant));
+    }
+    console.log(`[CategoryChart] Excluding ${this.recurringMerchants.size} recurring merchants`);
   }
 
   /**
@@ -33,8 +49,8 @@ export class CategoryChart {
     const tabsContainer = document.createElement('div');
     tabsContainer.className = 'category-tabs';
     tabsContainer.innerHTML = `
-      <button class="category-tab active" data-type="expense">Expenses</button>
-      <button class="category-tab" data-type="income">Income</button>
+      <button class="category-tab active" data-type="expense">Unique Expenses</button>
+      <button class="category-tab" data-type="income">Unique Income</button>
     `;
 
     container.insertBefore(tabsContainer, container.firstChild);
@@ -201,7 +217,13 @@ export class CategoryChart {
       ? transactions.filter(t => t.isExpense())
       : transactions.filter(t => t.isIncome());
 
-    filteredTransactions.forEach(t => {
+    // Filter out recurring merchants
+    const uniqueTransactions = filteredTransactions.filter(t => {
+      const merchant = t.normalizedMerchant || t.payee;
+      return !this.recurringMerchants.has(merchant);
+    });
+
+    uniqueTransactions.forEach(t => {
       const category = t.category;
       if (!categoryTotals[category]) {
         categoryTotals[category] = 0;
@@ -239,7 +261,13 @@ export class CategoryChart {
       ? transactions.filter(t => t.isExpense())
       : transactions.filter(t => t.isIncome());
 
-    filteredTransactions.forEach(t => {
+    // Filter out recurring merchants
+    const uniqueTransactions = filteredTransactions.filter(t => {
+      const merchant = t.normalizedMerchant || t.payee;
+      return !this.recurringMerchants.has(merchant);
+    });
+
+    uniqueTransactions.forEach(t => {
       const periodKey = this.getPeriodKey(t.bookingDate);
 
       if (!periodGroups[periodKey]) {

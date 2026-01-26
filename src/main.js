@@ -149,6 +149,13 @@ class App {
       const recurringIncome = this.recurringDetector.detect(this.transactions, 'income');
       console.log(`Detected ${recurringExpenses.length} recurring expenses and ${recurringIncome.length} recurring income`);
 
+      // Set transaction data for future projection view
+      const recurringData = { expenses: recurringExpenses, income: recurringIncome };
+      this.futureProjectionView.setTransactionData(this.transactions, recurringData);
+
+      // Auto-populate projections from overview data (only first time)
+      await this.futureProjectionView.autoPopulateFromOverview();
+
       // Show dashboard
       this.showDashboard();
 

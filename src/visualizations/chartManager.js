@@ -36,7 +36,7 @@ export class ChartManager {
   /**
    * Update all charts with new data
    * @param {Array<Transaction>} transactions - Filtered transactions
-   * @param {Array<Object>} recurring - Recurring patterns
+   * @param {Object} recurring - Recurring patterns {expenses, income}
    */
   updateAll(transactions, recurring) {
     if (this.timelineChart) {
@@ -44,6 +44,8 @@ export class ChartManager {
     }
 
     if (this.categoryChart) {
+      // Pass recurring data to exclude from category breakdown
+      this.categoryChart.setRecurringMerchants(recurring);
       this.categoryChart.update(transactions);
     }
 
