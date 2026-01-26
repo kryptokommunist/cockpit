@@ -10,9 +10,18 @@ export class FutureFinancialQA {
     this.projectionService = projectionService;
     this.llmService = new LLMService();
     this.conversationHistory = [];
+    this.transactions = []; // Will be set by update()
+    this.startingBalance = 0;
 
     this.render();
     this.checkLLMAvailability();
+  }
+
+  update(transactions) {
+    this.transactions = transactions;
+    // Calculate current balance (sum of all transactions)
+    this.startingBalance = transactions.reduce((sum, t) => sum + t.amount, 0);
+    console.log(`[FutureFinancialQA] Starting balance: €${this.startingBalance.toFixed(2)}`);
   }
 
   async checkLLMAvailability() {
@@ -44,8 +53,8 @@ export class FutureFinancialQA {
           <div class="quick-buttons">
             <button class="btn-quick" data-action="next-month">What is my projected budget for next month?</button>
             <button class="btn-quick" data-action="recurring">What are my recurring costs?</button>
-            <button class="btn-quick" data-action="savings-goal">Can I afford a €1000 purchase next month?</button>
-            <button class="btn-quick" data-action="balance">What will my balance be in 6 months?</button>
+            <button class="btn-quick" data-action="savings-goal">Can I afford a €1000 purchase?</button>
+            <button class="btn-quick" data-action="six-months">What will my balance be in 6 months?</button>
           </div>
         </div>
 
@@ -53,14 +62,14 @@ export class FutureFinancialQA {
           <button class="qa-tab active" data-tab="chat">Chat</button>
           <button class="qa-tab" data-tab="debug">Debug</button>
           <div class="qa-history-indicator">
-            <span id="future-future-qa-history-count">0 messages</span> in context
-            <button id="future-future-clear-context-btn" class="btn-clear-context" title="Clear conversation context">×</button>
+            <span id="future-qa-history-count">0 messages</span> in context
+            <button id="future-clear-context-btn" class="btn-clear-context" title="Clear conversation context">×</button>
           </div>
         </div>
 
         <div class="qa-tab-content">
           <div class="qa-tab-panel active" id="future-qa-tab-chat">
-            <div class="future-qa-conversation" id="future-future-qa-conversation">
+            <div class="qa-conversation" id="future-qa-conversation">
               <div class="qa-welcome">
                 <p><strong>Welcome to your AI Future Projection Assistant!</strong></p>
                 <p>I can analyze your future projections and answer questions like:</p>
@@ -71,13 +80,14 @@ export class FutureFinancialQA {
                   <li>"What will my balance be in 6 months?"</li>
                   <li>"How can I reduce my projected expenses?"</li>
                 </ul>
+                <p><em>Note: Make sure to add projections above first, or load from overview data!</em></p>
                 <p>Try the quick action buttons or ask your own question!</p>
               </div>
             </div>
           </div>
 
           <div class="qa-tab-panel" id="future-qa-tab-debug">
-            <div class="future-qa-debug" id="future-future-qa-debug">
+            <div class="qa-debug" id="future-qa-debug">
               <div class="debug-welcome">
                 <p>Debug view - Shows all agent interactions</p>
                 <p>Tool calls, inputs, and outputs will appear here as the agent works.</p>
@@ -86,9 +96,9 @@ export class FutureFinancialQA {
           </div>
         </div>
 
-        <div class="future-qa-input-container">
-          <input type="text" id="future-future-qa-input" placeholder="Ask a question about your future projections..." />
-          <button id="future-future-qa-send-btn" class="btn btn-primary">Send</button>
+        <div class="qa-input-container">
+          <input type="text" id="future-qa-input" placeholder="Ask a question about your future projections..." />
+          <button id="future-qa-send-btn" class="btn btn-primary">Send</button>
         </div>
       </div>
     `;
@@ -164,7 +174,7 @@ export class FutureFinancialQA {
     // Update tab panels
     const panels = this.container.querySelectorAll('.qa-tab-panel');
     panels.forEach(panel => {
-      if (panel.id === `qa-tab-${tabName}`) {
+      if (panel.id === `future-qa-tab-${tabName}`) {
         panel.classList.add('active');
       } else {
         panel.classList.remove('active');
@@ -190,16 +200,57 @@ export class FutureFinancialQA {
     const thinkingId = this.addThinkingIndicator();
 
     try {
-      // Get budget and recurring data
-      const budget = this.budgetCalculator.calculate(this.transactions, 'all');
-      const recurring = this.recurringDetector.detect(this.transactions);
+      // Get projection data
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 12);
+      const projections = this.projectionService.generateProjections(startDate, endDate);
+      const recurringItems = this.projectionService.getRecurringItems();
+      const oneTimeItems = this.projectionService.getOneTimeItems();
+
+      // Package projection data
+      const projectionData = {
+        projections,
+        recurringItems,
+        oneTimeItems,
+        startingBalance: this.startingBalance || 0
+      };
+
+      console.log('[FutureFinancialQA] Projection data:', {
+        projectionsCount: projections.length,
+        recurringItemsCount: recurringItems.length,
+        oneTimeItemsCount: oneTimeItems.length,
+        sampleProjection: projections[0],
+        dateRange: { start: startDate, end: endDate },
+        firstFewProjections: projections.slice(0, 3)
+      });
+
+      if (projections.length > 0) {
+        console.log('[FutureFinancialQA] Sample projection details:', JSON.stringify(projections[0], null, 2));
+      }
+      if (recurringItems.length > 0) {
+        console.log('[FutureFinancialQA] Sample recurring item:', JSON.stringify(recurringItems[0], null, 2));
+      }
+
+      // Check if we have any projections
+      if (projections.length === 0 && recurringItems.length === 0 && oneTimeItems.length === 0) {
+        this.removeMessage(thinkingId);
+        this.removeMessage(streamingId);
+        this.addMessage('assistant',
+          'You don\'t have any future projections defined yet. Please go to the "Overview" tab and the system will automatically populate recurring expenses and income from your transaction history. You can also manually add projections in the Future Projection view above.',
+          false,
+          false
+        );
+        return;
+      }
 
       // Get AI response with streaming and conversation history
+      // Pass empty transactions array since we're using projections
       await this.llmService.answerFinancialQuestion(
         question,
-        this.transactions,
-        budget,
-        recurring,
+        [], // No historical transactions needed for future projections
+        projectionData, // Pass projection data as budget parameter
+        recurringItems, // Pass recurring items
         (toolName, toolInput, toolResult) => {
           this.updateThinkingIndicator(thinkingId, toolName);
           this.addDebugEntry('tool', toolName, toolInput, toolResult);
@@ -451,14 +502,16 @@ export class FutureFinancialQA {
 
   async handleQuickAction(action) {
     const now = new Date();
-    const currentMonth = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const nextMonthName = nextMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    const sixMonthsLater = new Date(now.getFullYear(), now.getMonth() + 6, 1);
+    const sixMonthsName = sixMonthsLater.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
     const questions = {
-      'current-month': `What is my budget for ${currentMonth}? How can I balance it?`,
-      savings: 'How can I save more money? What should I cut back on?',
-      categories: 'What categories am I spending the most on? What should I spend less on to save money?',
-      compare: `Compare my budget for ${currentMonth} with ${lastMonth}. What changed?`
+      'next-month': `What is my projected budget for ${nextMonthName}?`,
+      'recurring': 'What are my recurring costs? List all recurring income and expenses.',
+      'savings-goal': 'Can I afford a €1000 purchase next month based on my projections?',
+      'six-months': `What will my projected balance be in ${sixMonthsName} (6 months from now)?`
     };
 
     const question = questions[action];
@@ -466,107 +519,6 @@ export class FutureFinancialQA {
       const input = this.container.querySelector('#future-qa-input');
       input.value = question;
       await this.handleSendMessage();
-    }
-  }
-
-    console.log('[FutureFinancialQA] AI Categorization started');
-    const progressFill = this.container.querySelector('#categorize-progress-fill');
-    const progressText = this.container.querySelector('#categorize-progress-text');
-
-    // Disable button and show progress
-    btn.disabled = true;
-    btn.textContent = 'Categorizing...';
-    progressContainer.classList.remove('hidden');
-
-    try {
-      // Process all transactions (will recategorize already categorized ones)
-      const transactionsToCategorize = this.transactions;
-      console.log('[FutureFinancialQA] Found', transactionsToCategorize.length, 'transactions to categorize');
-
-      if (transactionsToCategorize.length === 0) {
-        alert('No transactions to categorize!');
-        // Reset UI before returning
-        btn.disabled = false;
-        btn.textContent = 'Use AI to Categorize Transactions';
-        progressContainer.classList.add('hidden');
-        return;
-      }
-
-      // Get existing categories from transactions
-      const existingCategories = [...new Set(this.transactions.map(t => t.category))].filter(Boolean);
-      console.log('[FutureFinancialQA] Existing categories:', existingCategories);
-
-      // Initialize progress display
-      progressText.textContent = `Starting batch categorization...`;
-      progressFill.style.width = '0%';
-      progressFill.style.animation = 'none';
-
-      const onProgress = (current, total, batch, totalBatches) => {
-        console.log('[FutureFinancialQA] Progress: Batch', batch, '/', totalBatches, '-', current, '/', total);
-        const percentage = (current / total) * 100;
-        progressFill.style.width = `${percentage}%`;
-        progressText.textContent = `Batch ${batch}/${totalBatches}: ${current} / ${total} transactions (${percentage.toFixed(0)}%)`;
-      };
-
-      console.log('[FutureFinancialQA] Calling batchCategorize with existing categories...');
-
-      // Batch categorize with existing categories
-      const { results, newCategories } = await this.llmService.batchCategorize(
-        transactionsToCategorize,
-        existingCategories,
-        onProgress
-      );
-      console.log('[FutureFinancialQA] Got results:', results.size, 'categorized');
-      console.log('[FutureFinancialQA] New categories discovered:', newCategories);
-
-      // Apply categories
-      console.log('[FutureFinancialQA] Applying categories to transactions...');
-      let appliedCount = 0;
-      results.forEach((category, transactionId) => {
-        const transaction = this.transactions.find(t => t.id === transactionId);
-        if (transaction) {
-          transaction.category = category;
-          appliedCount++;
-        } else {
-          console.warn('[FutureFinancialQA] Could not find transaction with ID:', transactionId);
-        }
-      });
-      console.log('[FutureFinancialQA] Applied', appliedCount, 'categories');
-
-      // Dispatch event with new categories for saving
-      if (newCategories && newCategories.length > 0) {
-        window.dispatchEvent(new CustomEvent('new-categories-discovered', {
-          detail: { newCategories }
-        }));
-      }
-
-      // Save categorizations to storage
-      console.log('[FutureFinancialQA] Saving categorizations...');
-        try {
-          console.log('[FutureFinancialQA] Categorizations saved successfully');
-        } catch (saveError) {
-          console.error('[FutureFinancialQA] Error saving categorizations:', saveError);
-        }
-      }
-
-      // Notify success
-      let successMessage = `Successfully categorized ${results.size} transactions with AI!`;
-      if (newCategories && newCategories.length > 0) {
-        successMessage += ` ${newCategories.length} new categories discovered: ${newCategories.join(', ')}`;
-      }
-      successMessage += ' Categorizations saved. Charts updated.';
-      this.showSuccess(successMessage);
-
-      // Trigger app update (would need to be passed from parent)
-      window.dispatchEvent(new CustomEvent('transactions-updated'));
-    } catch (error) {
-      console.error('[FutureFinancialQA] Error during categorization:', error);
-      this.showError(`Error during AI categorization: ${error.message}`);
-    } finally {
-      // Reset UI
-      btn.disabled = false;
-      btn.textContent = 'Categorize All Transactions with AI';
-      progressContainer.classList.add('hidden');
     }
   }
 

@@ -73,14 +73,23 @@ app.get('/api/test', async (req, res) => {
 // Proxy endpoint for Claude API with tool support and streaming thinking
 app.post('/api/claude', async (req, res) => {
   try {
-    const { prompt, maxTokens = 1024, transactions = [], tools = [], streaming = false } = req.body;
+    const { prompt, maxTokens = 1024, transactions = [], projections = null, tools = [], streaming = false } = req.body;
 
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt is required' });
     }
 
     console.log(`[Claude API] Request: ${prompt.substring(0, 100)}...`);
-    console.log(`[Claude API] Has tools: ${tools.length > 0}, Has transactions: ${transactions.length > 0}, Streaming: ${streaming}`);
+    console.log(`[Claude API] Has tools: ${tools.length > 0}, Has transactions: ${transactions.length > 0}, Has projections: ${!!projections}, Streaming: ${streaming}`);
+
+    if (projections) {
+      console.log('[Claude API] Projections structure:', {
+        keys: Object.keys(projections),
+        projectionsCount: projections.projections?.length || 0,
+        recurringItemsCount: projections.recurringItems?.length || 0,
+        oneTimeItemsCount: projections.oneTimeItems?.length || 0
+      });
+    }
 
     // Build Claude request with tools if provided
     const requestBody = {
@@ -152,7 +161,7 @@ app.post('/api/claude', async (req, res) => {
         const toolResults = [];
         for (const toolUseBlock of toolUseBlocks) {
           try {
-            const toolResult = await executeToolOnTransactions(toolUseBlock.name, toolUseBlock.input, transactions);
+            const toolResult = await executeToolOnTransactions(toolUseBlock.name, toolUseBlock.input, transactions, projections);
 
             // Send thinking update with result if streaming
             if (streaming) {
@@ -252,7 +261,7 @@ app.post('/api/claude', async (req, res) => {
 });
 
 // Execute tool on transaction data
-async function executeToolOnTransactions(toolName, input, transactions) {
+async function executeToolOnTransactions(toolName, input, transactions, projections = null) {
   console.log(`[Tool] Executing ${toolName} with input:`, input);
 
   switch (toolName) {
@@ -461,6 +470,149 @@ async function executeToolOnTransactions(toolName, input, transactions) {
           purpose: t.purpose,
           amount: t.amount,
           category: t.category
+        }))
+      };
+    }
+
+    case 'get_future_projections_for_month': {
+      console.log('[Tool] get_future_projections_for_month - input:', JSON.stringify(input));
+      console.log('[Tool] projections object:', projections ? 'exists' : 'null');
+      console.log('[Tool] projections keys:', projections ? Object.keys(projections) : 'N/A');
+      console.log('[Tool] projections.projections:', projections?.projections ? `array with ${projections.projections.length} items` : 'missing');
+
+      if (projections?.projections?.length > 0) {
+        console.log('[Tool] First projection sample:', JSON.stringify(projections.projections[0]));
+      }
+
+      if (!projections || !projections.projections) {
+        console.log('[Tool] ERROR: No projection data available');
+        return { error: 'No projection data available' };
+      }
+
+      const { year, month } = input;
+      // Use same logic as UI: start of month to start of next month (exclusive end)
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 1); // First day of NEXT month
+
+      console.log('[Tool] Filtering for date range:', { startDate, endDate, month, year });
+
+      const monthProjections = projections.projections.filter(p => {
+        const pDate = new Date(p.date);
+        return pDate >= startDate && pDate < endDate; // Note: < not <=
+      });
+
+      console.log('[Tool] Found', monthProjections.length, 'projections for the month');
+
+      const income = monthProjections.filter(p => p.isIncome).reduce((s, p) => s + Math.abs(p.amount), 0);
+      const expenses = monthProjections.filter(p => !p.isIncome).reduce((s, p) => s + Math.abs(p.amount), 0);
+
+      // Calculate cumulative balance (starting balance + all changes up to this month)
+      const startingBalance = projections.startingBalance || 0;
+
+      // Get all projections from start date (now) up to end of requested month
+      const now = new Date();
+      const allProjectionsUpToMonth = projections.projections.filter(p => {
+        const pDate = new Date(p.date);
+        return pDate >= now && pDate < endDate;
+      });
+
+      // Calculate cumulative balance
+      let cumulativeBalance = startingBalance;
+      allProjectionsUpToMonth.forEach(p => {
+        if (p.isIncome) {
+          cumulativeBalance += Math.abs(p.amount);
+        } else {
+          cumulativeBalance -= Math.abs(p.amount);
+        }
+      });
+
+      const categoryBreakdown = {};
+      monthProjections.filter(p => !p.isIncome).forEach(p => {
+        const cat = p.category || 'OTHER';
+        categoryBreakdown[cat] = (categoryBreakdown[cat] || 0) + Math.abs(p.amount);
+      });
+
+      return {
+        period: `${year}-${String(month).padStart(2, '0')}`,
+        projectedIncome: Number(income.toFixed(2)),
+        projectedExpenses: Number(expenses.toFixed(2)),
+        monthlyBalance: Number((income - expenses).toFixed(2)),
+        projectedBalance: Number(cumulativeBalance.toFixed(2)), // This is now cumulative
+        projectedSavingsRate: income > 0 ? Number(((income - expenses) / income * 100).toFixed(1)) : 0,
+        categoryBreakdown: Object.entries(categoryBreakdown)
+          .sort((a, b) => b[1] - a[1])
+          .map(([cat, amt]) => ({
+            category: cat,
+            amount: Number(amt.toFixed(2)),
+            percentage: expenses > 0 ? Number((amt / expenses * 100).toFixed(1)) : 0
+          }))
+      };
+    }
+
+    case 'get_recurring_projections': {
+      if (!projections || !projections.recurringItems) {
+        return { error: 'No projection data available' };
+      }
+
+      const recurringItems = projections.recurringItems;
+      const expenses = recurringItems.filter(item => !item.isIncome).map(item => {
+        let monthlyCost = Math.abs(item.amount);
+        switch (item.frequency) {
+          case 'weekly': monthlyCost = monthlyCost * 4.33; break;
+          case 'quarterly': monthlyCost = monthlyCost / 3; break;
+          case 'yearly': monthlyCost = monthlyCost / 12; break;
+        }
+        return {
+          name: item.name,
+          category: item.category,
+          frequency: item.frequency,
+          amount: Number(Math.abs(item.amount).toFixed(2)),
+          monthlyCost: Number(monthlyCost.toFixed(2))
+        };
+      });
+
+      const income = recurringItems.filter(item => item.isIncome).map(item => {
+        let monthlyCost = Math.abs(item.amount);
+        switch (item.frequency) {
+          case 'weekly': monthlyCost = monthlyCost * 4.33; break;
+          case 'quarterly': monthlyCost = monthlyCost / 3; break;
+          case 'yearly': monthlyCost = monthlyCost / 12; break;
+        }
+        return {
+          name: item.name,
+          category: item.category,
+          frequency: item.frequency,
+          amount: Number(Math.abs(item.amount).toFixed(2)),
+          monthlyCost: Number(monthlyCost.toFixed(2))
+        };
+      });
+
+      const totalExpenses = expenses.reduce((s, e) => s + e.monthlyCost, 0);
+      const totalIncome = income.reduce((s, i) => s + i.monthlyCost, 0);
+
+      return {
+        recurringExpenses: expenses,
+        recurringIncome: income,
+        summary: {
+          totalRecurringExpenses: Number(totalExpenses.toFixed(2)),
+          totalRecurringIncome: Number(totalIncome.toFixed(2)),
+          netRecurring: Number((totalIncome - totalExpenses).toFixed(2))
+        }
+      };
+    }
+
+    case 'get_onetime_projections': {
+      if (!projections || !projections.oneTimeItems) {
+        return { error: 'No projection data available' };
+      }
+
+      return {
+        oneTimeItems: projections.oneTimeItems.map(item => ({
+          name: item.name,
+          category: item.category,
+          date: new Date(item.date).toISOString().split('T')[0],
+          amount: Number(Math.abs(item.amount).toFixed(2)),
+          isIncome: item.isIncome
         }))
       };
     }

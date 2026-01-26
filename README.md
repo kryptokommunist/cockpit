@@ -1,6 +1,6 @@
-# Bank Transaction Analyzer
+# 🛩️ Cockpit - Financial Control Center
 
-A powerful webapp to analyze and visualize bank transactions from German CSV exports, with automatic categorization, recurring cost detection, budget calculation, and AI-powered financial insights.
+Your personal financial command center. Analyze and visualize bank transactions from German CSV exports, with automatic categorization, recurring cost detection, budget calculation, future projections, and AI-powered financial insights.
 
 ## Features
 

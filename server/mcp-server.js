@@ -6,7 +6,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 /**
- * MCP Server for Bank Transaction Analysis
+ * MCP Server for Cockpit - Financial Control Center
  * Provides tools for Claude to query and analyze financial data
  */
 
@@ -337,7 +337,7 @@ function getOneTimeProjections() {
 export function createMCPServer() {
   const server = new Server(
     {
-      name: 'bank-transaction-analyzer',
+      name: 'cockpit-financial',
       version: '1.0.0',
     },
     {
@@ -592,5 +592,5 @@ export async function startMCPServer() {
   const server = createMCPServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('Bank Transaction Analyzer MCP Server running on stdio');
+  console.error('Cockpit Financial MCP Server running on stdio');
 }

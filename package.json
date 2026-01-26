@@ -1,6 +1,7 @@
 {
-  "name": "bank-transaction-analyzer",
+  "name": "cockpit-financial",
   "version": "1.0.0",
+  "description": "Cockpit - Your Financial Control Center",
   "type": "module",
   "scripts": {
     "dev": "vite",

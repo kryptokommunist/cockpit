@@ -253,26 +253,73 @@ Respond with ONLY the category name in UPPERCASE, nothing else.`;
     const minDate = new Date(Math.min(...dates));
     const maxDate = new Date(Math.max(...dates));
 
+    // Check if we're in projection mode
+    const isProjectionMode = budgetData && budgetData.projections;
+
     // Define tools for Claude to use
-    const tools = [
-      {
-        name: 'get_budget_for_month',
-        description: 'Get detailed budget data for a specific month including income, expenses, balance, savings rate, and category-by-category breakdown. Use this when the user asks about a specific month.',
-        input_schema: {
-          type: 'object',
-          properties: {
-            year: {
-              type: 'number',
-              description: 'Year (e.g., 2026)'
+    let tools = [];
+
+    if (isProjectionMode) {
+      // Future projection tools
+      tools = [
+        {
+          name: 'get_future_projections_for_month',
+          description: 'Get projected future income, expenses, balance, and category breakdown for a specific future month based on user-defined projections. Use this to answer questions about future months.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              year: {
+                type: 'number',
+                description: 'Year (e.g., 2026)'
+              },
+              month: {
+                type: 'number',
+                description: 'Month number (1-12, where 1 is January)'
+              }
             },
-            month: {
-              type: 'number',
-              description: 'Month number (1-12, where 1 is January)'
-            }
-          },
-          required: ['year', 'month']
+            required: ['year', 'month']
+          }
+        },
+        {
+          name: 'get_recurring_projections',
+          description: 'Get all recurring income and expense projections (subscriptions, salary, regular bills) with their frequencies and monthly costs. Use this to understand ongoing financial commitments.',
+          input_schema: {
+            type: 'object',
+            properties: {},
+            required: []
+          }
+        },
+        {
+          name: 'get_onetime_projections',
+          description: 'Get all one-time future income and expense projections (planned purchases, bonus payments, etc.). Use this to see upcoming one-time financial events.',
+          input_schema: {
+            type: 'object',
+            properties: {},
+            required: []
+          }
         }
-      },
+      ];
+    } else {
+      // Historical transaction tools
+      tools = [
+        {
+          name: 'get_budget_for_month',
+          description: 'Get detailed budget data for a specific month including income, expenses, balance, savings rate, and category-by-category breakdown. Use this when the user asks about a specific month.',
+          input_schema: {
+            type: 'object',
+            properties: {
+              year: {
+                type: 'number',
+                description: 'Year (e.g., 2026)'
+              },
+              month: {
+                type: 'number',
+                description: 'Month number (1-12, where 1 is January)'
+              }
+            },
+            required: ['year', 'month']
+          }
+        },
       {
         name: 'get_spending_by_category',
         description: 'Get detailed spending breakdown by category for any date range, including transaction counts, averages, and top transactions per category. Use this to analyze spending patterns.',
@@ -392,6 +439,7 @@ Respond with ONLY the category name in UPPERCASE, nothing else.`;
         }
       }
     ];
+    }
 
     // Build conversation history context
     let conversationContext = '';
@@ -405,7 +453,41 @@ Respond with ONLY the category name in UPPERCASE, nothing else.`;
       conversationContext += '---\n\n';
     }
 
-    const prompt = `You are a personal finance advisor. The user has financial transaction data from ${minDate.toISOString().split('T')[0]} to ${maxDate.toISOString().split('T')[0]}.
+    let prompt;
+
+    if (isProjectionMode) {
+      // Projection mode prompt
+      prompt = `You are a personal finance advisor helping with future financial planning. The user has defined future projections including recurring income/expenses and one-time transactions.
+${conversationContext}
+**Current Question:** ${question}
+
+You have access to tools to analyze projected financial data:
+
+**Projection Tools:**
+- get_future_projections_for_month: Get projected income, expenses, balance for a specific future month
+- get_recurring_projections: Get all recurring items (salary, subscriptions, bills) with frequencies
+- get_onetime_projections: Get all one-time planned transactions
+
+**How to approach questions:**
+1. Use get_future_projections_for_month to see overall budget projections for specific months
+2. Use get_recurring_projections to understand ongoing financial commitments
+3. Use get_onetime_projections to see planned one-time expenses/income
+4. Provide specific, actionable advice based on the projected data
+
+Examples:
+- "What will my balance be next month?" → Get future projections for next month
+- "What are my recurring costs?" → Get recurring projections
+- "Can I afford a €1000 purchase?" → Check projected balance and recurring costs
+
+Context:
+${recurringCosts.length > 0 ? `- You have ${recurringCosts.length} defined recurring items` : ''}
+
+Today's date is ${new Date().toISOString().split('T')[0]}.
+
+IMPORTANT: Base your analysis on user-defined projections, not historical data.`;
+    } else {
+      // Historical transaction mode prompt
+      prompt = `You are a personal finance advisor. The user has financial transaction data from ${minDate.toISOString().split('T')[0]} to ${maxDate.toISOString().split('T')[0]}.
 ${conversationContext}
 **Current Question:** ${question}
 
@@ -439,22 +521,50 @@ ${budgetData ? `- Overall average monthly expenses: ${budgetData.avgMonthlyExpen
 Today's date is ${new Date().toISOString().split('T')[0]}.
 
 IMPORTANT: Use multiple tool calls if needed to gather complete information before answering. Don't hesitate to drill down into transaction details.`;
+    }
 
     try {
       console.log('[LLMService] Sending question with tools to Claude (streaming)');
+
+      // Check if we're dealing with projections (passed as budgetData)
+      const isProjectionMode = budgetData && budgetData.projections;
+      const projectionData = isProjectionMode ? budgetData : null;
+
+      console.log('[LLMService] isProjectionMode:', isProjectionMode);
+      console.log('[LLMService] budgetData:', budgetData ? {
+        hasProjections: !!budgetData.projections,
+        projectionsLength: budgetData.projections?.length,
+        hasRecurringItems: !!budgetData.recurringItems,
+        recurringItemsLength: budgetData.recurringItems?.length,
+        hasOneTimeItems: !!budgetData.oneTimeItems,
+        oneTimeItemsLength: budgetData.oneTimeItems?.length
+      } : 'null');
+
+      const requestBody = {
+        prompt,
+        maxTokens: 2048,
+        transactions: transactionsData,
+        projections: projectionData,
+        tools,
+        streaming: !!onThinking
+      };
+
+      console.log('[LLMService] Request body summary:', {
+        hasPrompt: !!requestBody.prompt,
+        transactionsCount: requestBody.transactions?.length || 0,
+        hasProjections: !!requestBody.projections,
+        projectionsCount: requestBody.projections?.projections?.length || 0,
+        toolsCount: requestBody.tools?.length || 0,
+        toolNames: requestBody.tools?.map(t => t.name) || [],
+        streaming: requestBody.streaming
+      });
 
       const response = await fetch(`${this.backendUrl}/claude`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          prompt,
-          maxTokens: 2048,
-          transactions: transactionsData,
-          tools,
-          streaming: !!onThinking
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {

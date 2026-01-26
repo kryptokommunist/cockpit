@@ -51,7 +51,7 @@ class App {
   }
 
   async init() {
-    console.log('Initializing Bank Transaction Analyzer...');
+    console.log('Initializing Cockpit...');
 
     // Load settings
     await this.settingsManager.load();
@@ -247,6 +247,8 @@ class App {
       futureQAContainer,
       this.projectionService
     );
+    // Set initial transaction data for balance calculation
+    this.futureFinancialQA.update(this.transactions);
 
     // Initialize settings view
     const settingsContainer = document.getElementById('settings-container');
