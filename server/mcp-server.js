@@ -14,6 +14,7 @@ import {
 let transactionsData = [];
 let budgetCalculatorFunc = null;
 let recurringDetectorFunc = null;
+let projectionsData = null; // Future projections
 
 /**
  * Initialize the data that the MCP server will use
@@ -22,6 +23,13 @@ export function initializeMCPData(transactions, budgetCalc, recurringDetect) {
   transactionsData = transactions;
   budgetCalculatorFunc = budgetCalc;
   recurringDetectorFunc = recurringDetect;
+}
+
+/**
+ * Initialize future projection data
+ */
+export function initializeProjectionData(projectionService) {
+  projectionsData = projectionService;
 }
 
 /**
@@ -192,6 +200,138 @@ function compareBudgets(period1Start, period1End, period2Start, period2End) {
 }
 
 /**
+ * Get future projections for a specific month
+ */
+function getFutureProjectionsForMonth(year, month) {
+  if (!projectionsData) {
+    return {
+      error: 'Projection data not initialized'
+    };
+  }
+
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0);
+
+  const projections = projectionsData.generateProjections(startDate, endDate);
+
+  const income = projections
+    .filter(p => p.isIncome)
+    .reduce((sum, p) => sum + Math.abs(p.amount), 0);
+
+  const expenses = projections
+    .filter(p => !p.isIncome)
+    .reduce((sum, p) => sum + Math.abs(p.amount), 0);
+
+  const categoryBreakdown = {};
+  projections.filter(p => !p.isIncome).forEach(p => {
+    const category = p.category;
+    categoryBreakdown[category] = (categoryBreakdown[category] || 0) + Math.abs(p.amount);
+  });
+
+  return {
+    period: `${year}-${String(month).padStart(2, '0')}`,
+    projectedIncome: Number(income.toFixed(2)),
+    projectedExpenses: Number(expenses.toFixed(2)),
+    projectedBalance: Number((income - expenses).toFixed(2)),
+    projectedSavingsRate: income > 0 ? Number(((income - expenses) / income * 100).toFixed(1)) : 0,
+    categoryBreakdown: Object.entries(categoryBreakdown)
+      .sort((a, b) => b[1] - a[1])
+      .reduce((obj, [cat, amt]) => {
+        obj[cat] = {
+          amount: Number(amt.toFixed(2)),
+          percentage: expenses > 0 ? Number((amt / expenses * 100).toFixed(1)) : 0
+        };
+        return obj;
+      }, {})
+  };
+}
+
+/**
+ * Get all recurring projection items
+ */
+function getRecurringProjections() {
+  if (!projectionsData) {
+    return {
+      error: 'Projection data not initialized'
+    };
+  }
+
+  const recurringItems = projectionsData.getRecurringItems();
+
+  const expenses = recurringItems
+    .filter(item => !item.isIncome)
+    .map(item => {
+      let monthlyCost = Math.abs(item.amount);
+      switch (item.frequency) {
+        case 'weekly': monthlyCost = monthlyCost * 4.33; break;
+        case 'quarterly': monthlyCost = monthlyCost / 3; break;
+        case 'yearly': monthlyCost = monthlyCost / 12; break;
+      }
+      return {
+        name: item.name,
+        category: item.category,
+        frequency: item.frequency,
+        amount: Number(Math.abs(item.amount).toFixed(2)),
+        monthlyCost: Number(monthlyCost.toFixed(2))
+      };
+    });
+
+  const income = recurringItems
+    .filter(item => item.isIncome)
+    .map(item => {
+      let monthlyCost = Math.abs(item.amount);
+      switch (item.frequency) {
+        case 'weekly': monthlyCost = monthlyCost * 4.33; break;
+        case 'quarterly': monthlyCost = monthlyCost / 3; break;
+        case 'yearly': monthlyCost = monthlyCost / 12; break;
+      }
+      return {
+        name: item.name,
+        category: item.category,
+        frequency: item.frequency,
+        amount: Number(Math.abs(item.amount).toFixed(2)),
+        monthlyCost: Number(monthlyCost.toFixed(2))
+      };
+    });
+
+  const totalExpensesMonthlyCost = expenses.reduce((sum, e) => sum + e.monthlyCost, 0);
+  const totalIncomeMonthlyCost = income.reduce((sum, i) => sum + i.monthlyCost, 0);
+
+  return {
+    recurringExpenses: expenses,
+    recurringIncome: income,
+    summary: {
+      totalRecurringExpenses: Number(totalExpensesMonthlyCost.toFixed(2)),
+      totalRecurringIncome: Number(totalIncomeMonthlyCost.toFixed(2)),
+      netRecurring: Number((totalIncomeMonthlyCost - totalExpensesMonthlyCost).toFixed(2))
+    }
+  };
+}
+
+/**
+ * Get one-time projection items
+ */
+function getOneTimeProjections() {
+  if (!projectionsData) {
+    return {
+      error: 'Projection data not initialized'
+    };
+  }
+
+  const oneTimeItems = projectionsData.getOneTimeItems();
+
+  return {
+    oneTimeItems: oneTimeItems.map(item => ({
+      name: item.name,
+      category: item.category,
+      date: item.date.toISOString().split('T')[0],
+      amount: Number(Math.abs(item.amount).toFixed(2)),
+      isIncome: item.isIncome
+    }))
+  };
+}
+
+/**
  * Create MCP server
  */
 export function createMCPServer() {
@@ -291,6 +431,42 @@ export function createMCPServer() {
             required: ['period1Start', 'period1End', 'period2Start', 'period2End'],
           },
         },
+        {
+          name: 'get_future_projections_for_month',
+          description: 'Get projected future income, expenses, balance, and category breakdown for a specific future month based on user-defined projections',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              year: {
+                type: 'number',
+                description: 'Year (e.g., 2026)',
+              },
+              month: {
+                type: 'number',
+                description: 'Month number (1-12)',
+              },
+            },
+            required: ['year', 'month'],
+          },
+        },
+        {
+          name: 'get_recurring_projections',
+          description: 'Get all recurring income and expense projections (subscriptions, salary, regular bills) with their frequencies and monthly costs',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+            required: [],
+          },
+        },
+        {
+          name: 'get_onetime_projections',
+          description: 'Get all one-time future income and expense projections (planned purchases, bonus payments, etc.)',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+            required: [],
+          },
+        },
       ],
     };
   });
@@ -344,6 +520,42 @@ export function createMCPServer() {
             args.period2Start,
             args.period2End
           );
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(result, null, 2),
+              },
+            ],
+          };
+        }
+
+        case 'get_future_projections_for_month': {
+          const result = getFutureProjectionsForMonth(args.year, args.month);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(result, null, 2),
+              },
+            ],
+          };
+        }
+
+        case 'get_recurring_projections': {
+          const result = getRecurringProjections();
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(result, null, 2),
+              },
+            ],
+          };
+        }
+
+        case 'get_onetime_projections': {
+          const result = getOneTimeProjections();
           return {
             content: [
               {
