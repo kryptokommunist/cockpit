@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bank Transaction Analyzer</title>
+  <link rel="stylesheet" href="/styles/main.css">
+  <link rel="stylesheet" href="/styles/components.css">
+  <link rel="stylesheet" href="/styles/charts.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Bank Transaction Analyzer</h1>
+      <p class="subtitle">Analyze and visualize your bank transactions</p>
+    </header>
+
+    <main>
+      <!-- File Upload Section -->
+      <section id="upload-section" class="card">
+        <h2>Upload CSV File</h2>
+        <div id="file-upload-container"></div>
+        <div id="upload-status"></div>
+      </section>
+
+      <!-- Dashboard (hidden initially) -->
+      <div id="dashboard" class="hidden">
+        <!-- Summary Cards -->
+        <section id="summary-section" class="summary-grid">
+          <div class="summary-card">
+            <h3>Total Transactions</h3>
+            <p id="total-transactions" class="summary-value">0</p>
+          </div>
+          <div class="summary-card">
+            <h3>Total Income</h3>
+            <p id="total-income" class="summary-value">0,00 €</p>
+          </div>
+          <div class="summary-card">
+            <h3>Total Expenses</h3>
+            <p id="total-expenses" class="summary-value">0,00 €</p>
+          </div>
+          <div class="summary-card">
+            <h3>Balance</h3>
+            <p id="total-balance" class="summary-value">0,00 €</p>
+          </div>
+        </section>
+
+        <!-- Charts Section -->
+        <section id="charts-section">
+          <div class="chart-row">
+            <div class="chart-container card">
+              <h2>Timeline</h2>
+              <canvas id="timeline-chart"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-row">
+            <div class="chart-container card">
+              <h2>Category Breakdown</h2>
+              <canvas id="category-chart"></canvas>
+            </div>
+            <div class="chart-container card">
+              <h2>Recurring Costs</h2>
+              <canvas id="recurring-chart"></canvas>
+            </div>
+          </div>
+        </section>
+
+        <!-- Budget Calculator Section -->
+        <section id="budget-section" class="card">
+          <h2>Budget Calculator</h2>
+          <div id="budget-view-container"></div>
+        </section>
+
+        <!-- Top Merchants Section -->
+        <section id="top-merchants-section" class="card">
+          <div id="top-merchants-container"></div>
+        </section>
+
+        <!-- Financial Q&A Section -->
+        <section id="qa-section" class="card">
+          <h2>AI Financial Assistant</h2>
+          <div id="qa-container"></div>
+        </section>
+
+        <!-- Transaction List Section -->
+        <section id="transactions-section" class="card">
+          <h2>Transactions</h2>
+          <div id="filters-container"></div>
+          <div id="transaction-list-container"></div>
+        </section>
+
+        <!-- Settings Section -->
+        <section id="settings-section" class="card">
+          <div id="settings-container"></div>
+        </section>
+      </div>
+    </main>
+
+    <footer>
+      <p>Bank Transaction Analyzer - All data processed locally in your browser</p>
+    </footer>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

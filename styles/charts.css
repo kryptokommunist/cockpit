@@ -1,0 +1,50 @@
+/* Chart Styles */
+.chart-row {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.chart-row > * {
+  flex: 1;
+}
+
+.chart-container {
+  min-height: 300px;
+  position: relative;
+}
+
+.chart-container h2 {
+  margin-bottom: 1.5rem;
+  font-size: 1.25rem;
+}
+
+.chart-container canvas {
+  max-height: 400px;
+}
+
+/* Chart specific styles */
+#timeline-chart {
+  min-height: 250px;
+}
+
+#category-chart {
+  min-height: 300px;
+}
+
+#recurring-chart {
+  min-height: 300px;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .chart-row {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .chart-container canvas {
+    max-height: 300px;
+  }
+}

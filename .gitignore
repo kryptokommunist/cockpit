@@ -1,0 +1,27 @@
+# User data files
+settings.json
+ai-categorization.csv
+recategorization-rules.csv
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+
+# Environment variables
+.env
+.env.local
+
+# OS files
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# User CSV files
+umsatz.csv
