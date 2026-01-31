@@ -300,12 +300,14 @@ export class DKBModal {
         id: account.id,
         iban: account.iban,
         name: account.name,
-        type: account.type
+        type: account.type,
+        balance: account.balance,  // Store current balance for chart calculations
+        currency: account.currency || 'EUR'
       },
       savedAt: new Date().toISOString()
     };
     localStorage.setItem('dkb_credentials', JSON.stringify(credentials));
-    console.log('[DKB Modal] Credentials saved to localStorage');
+    console.log('[DKB Modal] Credentials saved to localStorage (balance:', account.balance, ')');
   }
 
   /**

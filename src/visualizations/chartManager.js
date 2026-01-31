@@ -37,10 +37,11 @@ export class ChartManager {
    * Update all charts with new data
    * @param {Array<Transaction>} transactions - Filtered transactions
    * @param {Object} recurring - Recurring patterns {expenses, income}
+   * @param {number} accountBalance - Current account balance from DKB (optional)
    */
-  updateAll(transactions, recurring) {
+  updateAll(transactions, recurring, accountBalance = null) {
     if (this.timelineChart) {
-      this.timelineChart.update(transactions);
+      this.timelineChart.update(transactions, accountBalance);
     }
 
     if (this.categoryChart) {

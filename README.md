@@ -27,6 +27,7 @@ Your personal financial command center for **Deutsche Kreditbank (DKB)** account
 ### Core Features
 - **DKB CSV Import** - Parse DKB CSV exports (semicolon-delimited, German date/number format)
 - **DKB Direct Connection** - Fetch transactions directly from your DKB account (requires 2FA via DKB app)
+- **Accurate Balance Tracking** - Timeline chart shows cumulative balance calculated from actual DKB account balance
 - **Automatic Categorization** - Rule-based categorization with German merchants (REWE, LIDL, BOLT, etc.)
 - **AI Categorization** - Use Claude AI to intelligently categorize transactions
 - **Manual Override** - Click any category to change it, persisted to localStorage
@@ -36,6 +37,7 @@ Your personal financial command center for **Deutsche Kreditbank (DKB)** account
 - **Interactive Charts** - Timeline, category breakdown, and recurring costs visualizations
 - **Filters** - Date range, category, search, and amount filters
 - **Future Projections** - Project your finances 12 months ahead based on recurring patterns
+- **Settings Management** - Manage data sources, AI configuration, and reset options from centralized settings
 - **Export** - Export budget reports and filtered transactions
 
 ### AI Features
@@ -164,7 +166,7 @@ The following categories are automatically detected:
 
 ### 2. View Dashboard (Overview Tab)
 - **Summary Cards**: See totals for transactions, income, expenses, and balance
-- **Timeline Chart**: Visualize income/expenses over time (monthly aggregation)
+- **Timeline Chart**: Visualize income/expenses over time with cumulative balance (uses actual DKB account balance for accurate tracking)
 - **Category Chart**: See spending distribution by category (doughnut chart)
 - **Recurring Costs**: View detected recurring payments (bar chart)
 - **AI Assistant**: Ask questions about your current finances
@@ -187,9 +189,10 @@ The following categories are automatically detected:
 - Or use AI categorization for bulk updates
 
 ### 6. Settings
-- Configure AI API settings
-- Manage recategorization rules
-- Upload new data sources
+- **Data Source**: View connection status, refresh DKB data, or disconnect/clear data
+- **AI API Configuration**: Configure API URL, token, and model for AI features
+- **Data Management**: Reset projections or clear all application data
+- **Recategorization Rules**: Manage automatic category mapping rules
 
 ## Project Structure
 

@@ -53,7 +53,6 @@ class App {
     this.futureProjectionView = null;
     this.dkbModal = null;
     this.sidebar = null;
-    this.settingsFileUpload = null;
     this.currentPage = 'dashboard'; // dashboard or settings
     this.currentTab = 'overview'; // overview or future (within dashboard)
 
@@ -102,14 +101,6 @@ class App {
       () => this.handleDKBConnect()
     );
 
-    // Initialize file upload for settings page (will be used after data is loaded)
-    const settingsUploadContainer = document.getElementById('settings-upload-container');
-    this.settingsFileUpload = new FileUpload(
-      settingsUploadContainer,
-      (file) => this.handleFileUpload(file),
-      () => this.handleDKBConnect()
-    );
-
     // Try to load saved DKB transactions first, then fall back to CSV
     const loadedFromDKB = await this.tryLoadSavedDKBData();
     if (!loadedFromDKB) {
@@ -130,6 +121,13 @@ class App {
 
       if (savedTransactions && savedTransactions.length > 0) {
         console.log(`[App] Loading ${savedTransactions.length} saved DKB transactions from localStorage`);
+
+        // Restore account balance from saved credentials
+        if (savedCredentials?.account?.balance !== undefined) {
+          this.accountBalance = savedCredentials.account.balance;
+          this.dataSource = 'dkb';
+          console.log(`[App] Restored account balance from localStorage: ${this.accountBalance}`);
+        }
 
         // Convert saved data to Transaction objects
         this.transactions = savedTransactions.map(t => new Transaction({
@@ -258,6 +256,11 @@ class App {
 
       const hadPreviousData = this.transactions.length > 0;
 
+      // Store the account's current balance for cumulative balance calculation
+      this.accountBalance = account?.balance || 0;
+      this.dataSource = 'dkb';
+      console.log(`[App] Stored account balance: ${this.accountBalance}`);
+
       // Convert DKB transaction data to Transaction objects
       // This REPLACES any existing CSV data
       this.transactions = transactionsData.map(t => new Transaction({
@@ -294,6 +297,11 @@ class App {
       console.log('Parsing CSV file...');
       this.transactions = await this.csvParser.parse(file);
       console.log(`Parsed ${this.transactions.length} transactions`);
+
+      // Track that data came from CSV
+      this.dataSource = 'csv';
+      this.csvFileName = file.name;
+      this.accountBalance = null; // CSV doesn't have account balance
 
       // Process transactions (common logic for CSV and DKB)
       await this.processTransactions();
@@ -364,6 +372,45 @@ class App {
     // Listen for DKB disconnect
     window.addEventListener('dkb-disconnected', () => {
       this.showNotification('DKB account disconnected', 'info');
+    });
+
+    // Listen for open DKB modal request from settings
+    window.addEventListener('open-dkb-modal', () => {
+      this.handleDKBConnect();
+    });
+
+    // Listen for reset projections request from settings
+    window.addEventListener('reset-projections-requested', async () => {
+      if (this.futureProjectionView) {
+        this.projectionService.clearAll();
+        await this.futureProjectionView.autoPopulateFromOverview();
+        this.futureProjectionView.updateProjection();
+      }
+    });
+
+    // Listen for data source query from settings
+    window.addEventListener('get-data-source', (event) => {
+      event.detail.callback({
+        source: this.dataSource || null,
+        fileName: this.csvFileName || null,
+        transactionCount: this.transactions?.length || 0
+      });
+    });
+
+    // Listen for CSV disconnect request
+    window.addEventListener('csv-disconnect-requested', () => {
+      this.transactions = [];
+      this.filteredTransactions = [];
+      this.dataSource = null;
+      this.csvFileName = null;
+      this.accountBalance = null;
+
+      // Hide dashboard and show upload section
+      document.getElementById('dashboard').classList.add('hidden');
+      document.getElementById('dashboard').style.display = 'none';
+      document.getElementById('upload-section').style.display = 'block';
+
+      this.showNotification('CSV data cleared', 'success');
     });
 
     // Listen for recategorize modal request
@@ -496,6 +543,11 @@ class App {
   }
 
   initializeComponents() {
+    // Destroy existing chart manager if it exists to prevent canvas reuse errors
+    if (this.chartManager) {
+      this.chartManager.destroyAll();
+    }
+
     // Initialize chart manager with recurring detector
     this.chartManager = new ChartManager(this.recurringDetector);
 
@@ -608,7 +660,7 @@ class App {
       const recurringExpenses = this.recurringDetector.detect(this.filteredTransactions, 'expense');
       const recurringIncome = this.recurringDetector.detect(this.filteredTransactions, 'income');
       const recurring = { expenses: recurringExpenses, income: recurringIncome };
-      this.chartManager.updateAll(this.filteredTransactions, recurring);
+      this.chartManager.updateAll(this.filteredTransactions, recurring, this.accountBalance);
     }
 
     // Update transaction list
