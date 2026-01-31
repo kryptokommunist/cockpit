@@ -32,11 +32,16 @@ export class FutureFinancialQA extends BaseQA {
     return 'future-qa';
   }
 
-  update(transactions) {
+  update(transactions, accountBalance = null) {
     this.transactions = transactions;
-    // Calculate current balance (sum of all transactions)
-    this.startingBalance = transactions.reduce((sum, t) => sum + t.amount, 0);
-    console.log(`[FutureFinancialQA] Starting balance: €${this.startingBalance.toFixed(2)}`);
+    // Use actual account balance if available (from DKB), otherwise calculate from transactions
+    if (accountBalance !== null && accountBalance !== undefined) {
+      this.startingBalance = accountBalance;
+      console.log(`[FutureFinancialQA] Using DKB account balance: €${this.startingBalance.toFixed(2)}`);
+    } else {
+      this.startingBalance = transactions.reduce((sum, t) => sum + t.amount, 0);
+      console.log(`[FutureFinancialQA] Calculated starting balance: €${this.startingBalance.toFixed(2)}`);
+    }
   }
 
   render() {

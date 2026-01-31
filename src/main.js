@@ -346,9 +346,9 @@ class App {
     const recurringIncome = this.recurringDetector.detect(this.transactions, 'income');
     console.log(`Detected ${recurringExpenses.length} recurring expenses and ${recurringIncome.length} recurring income`);
 
-    // Set transaction data for future projection view
+    // Set transaction data for future projection view (pass account balance for accurate starting point)
     const recurringData = { expenses: recurringExpenses, income: recurringIncome };
-    this.futureProjectionView.setTransactionData(this.transactions, recurringData, this.recurringDetector);
+    this.futureProjectionView.setTransactionData(this.transactions, recurringData, this.recurringDetector, this.accountBalance);
 
     // Auto-populate projections from overview data (only first time)
     await this.futureProjectionView.autoPopulateFromOverview();
@@ -593,8 +593,8 @@ class App {
       futureQAContainer,
       this.projectionService
     );
-    // Set initial transaction data for balance calculation
-    this.futureFinancialQA.update(this.transactions);
+    // Set initial transaction data for balance calculation (pass account balance)
+    this.futureFinancialQA.update(this.transactions, this.accountBalance);
 
     // Initialize settings view
     const settingsContainer = document.getElementById('settings-container');
@@ -692,7 +692,11 @@ class App {
     const totalExpenses = this.filteredTransactions
       .filter(t => t.isExpense())
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-    const balance = totalIncome - totalExpenses;
+
+    // Use actual account balance if available (from DKB), otherwise show net change
+    const balance = this.accountBalance !== null && this.accountBalance !== undefined
+      ? this.accountBalance
+      : totalIncome - totalExpenses;
 
     document.getElementById('total-transactions').textContent = totalTransactions;
     document.getElementById('total-income').textContent = formatCurrency(totalIncome);

@@ -22,14 +22,19 @@ export class FutureProjectionView {
    * @param {Object} recurringData - Detected recurring patterns (deprecated, now detected dynamically)
    * @param {Object} recurringDetector - Recurring detector instance
    */
-  setTransactionData(transactions, recurringData, recurringDetector) {
+  setTransactionData(transactions, recurringData, recurringDetector, accountBalance = null) {
     this.transactions = transactions;
     this.recurringData = recurringData;
     this.recurringDetector = recurringDetector;
 
-    // Calculate current balance
-    this.currentBalance = transactions.reduce((sum, t) => sum + t.amount, 0);
-    console.log(`[FutureProjectionView] Current balance: €${this.currentBalance.toFixed(2)}`);
+    // Use actual account balance if available (from DKB), otherwise calculate from transactions
+    if (accountBalance !== null && accountBalance !== undefined) {
+      this.currentBalance = accountBalance;
+      console.log(`[FutureProjectionView] Using DKB account balance: €${this.currentBalance.toFixed(2)}`);
+    } else {
+      this.currentBalance = transactions.reduce((sum, t) => sum + t.amount, 0);
+      console.log(`[FutureProjectionView] Calculated balance from transactions: €${this.currentBalance.toFixed(2)}`);
+    }
   }
 
   /**
