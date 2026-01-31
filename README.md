@@ -1,12 +1,32 @@
-# Cockpit - Financial Control Center
+# Cockpit - Financial Control Center for DKB
 
-Your personal financial command center. Analyze and visualize bank transactions from German CSV exports or directly from DKB (Deutsche Kreditbank), with automatic categorization, recurring cost detection, budget calculation, future projections, and AI-powered financial insights.
+Your personal financial command center for **Deutsche Kreditbank (DKB)** accounts. Analyze and visualize bank transactions from DKB CSV exports or connect directly to your DKB account, with automatic categorization, recurring cost detection, budget calculation, future projections, and AI-powered financial insights.
+
+> **Note**: This application is specifically designed for DKB (Deutsche Kreditbank) accounts and German banking CSV formats.
+
+## Screenshots
+
+### Dashboard Overview
+![Dashboard Overview](screenshots/dashboard-overview.png)
+*View your total transactions, income, expenses, and balance with an interactive timeline chart*
+
+### Category Breakdown & Recurring Costs
+![Category Breakdown](screenshots/category-breakdown.png)
+*Analyze spending by category and track recurring expenses like subscriptions and utilities*
+
+### AI Financial Assistant
+![AI Assistant](screenshots/ai-assistant.png)
+*Ask questions about your finances and get AI-powered insights and action items*
+
+### Future Projections
+![Future Projection](screenshots/future-projection.png)
+*Project your finances 12 months ahead based on recurring income and expenses*
 
 ## Features
 
 ### Core Features
-- **CSV Import** - Parse German bank CSV exports (semicolon-delimited, German date/number format)
-- **DKB Direct Connection** - Fetch transactions directly from your DKB account (requires 2FA)
+- **DKB CSV Import** - Parse DKB CSV exports (semicolon-delimited, German date/number format)
+- **DKB Direct Connection** - Fetch transactions directly from your DKB account (requires 2FA via DKB app)
 - **Automatic Categorization** - Rule-based categorization with German merchants (REWE, LIDL, BOLT, etc.)
 - **AI Categorization** - Use Claude AI to intelligently categorize transactions
 - **Manual Override** - Click any category to change it, persisted to localStorage
@@ -47,12 +67,13 @@ Your personal financial command center. Analyze and visualize bank transactions 
 
 ### Prerequisites
 - Docker and Docker Compose installed
-- Bank CSV file in German format OR DKB account credentials
+- DKB account OR DKB CSV export file
 
 ### Start the Application
 
 ```bash
-# Clone or navigate to the project directory
+# Clone the repository
+git clone https://github.com/kryptokommunist/cockpit.git
 cd cockpit
 
 # Build and start the containers (frontend + backend)
@@ -70,21 +91,11 @@ docker-compose down
 
 ## Data Sources
 
-### Option 1: CSV Import
-Upload a German bank CSV export with the following format:
+### Option 1: DKB CSV Import
+Export transactions from your DKB online banking and upload the CSV file:
 - **Delimiter**: Semicolon (;)
 - **Date Format**: DD.MM.YY (e.g., "25.01.26")
 - **Amount Format**: German decimal (comma separator, e.g., "123,45")
-
-#### Expected Columns
-- Buchungstag (Booking Date)
-- Wertstellung (Value Date)
-- Auftraggeber/Empfanger (Payee/Merchant)
-- Verwendungszweck (Purpose)
-- Kontonummer (Account Number)
-- BLZ (Bank Code)
-- Betrag (Amount)
-- Wahrung (Currency)
 
 ### Option 2: DKB Direct Connection
 Connect directly to your DKB account to fetch transactions:
@@ -147,7 +158,7 @@ The following categories are automatically detected:
 ## Usage Guide
 
 ### 1. Load Data
-- **CSV Upload**: Click "Choose CSV File" or drag and drop your bank CSV
+- **CSV Upload**: Click "Choose CSV File" or drag and drop your DKB CSV export
 - **DKB Connection**: Click "Connect to DKB" and follow the authentication flow
 - **Auto-load**: Place a `umsatz.csv` file in the project root for automatic loading
 
@@ -190,6 +201,7 @@ cockpit/
 ├── Dockerfile                          # Frontend container
 ├── Dockerfile.backend                  # Backend container (Node.js + Python)
 ├── docker-compose.yml                  # Docker orchestration
+├── screenshots/                        # Application screenshots
 ├── server/
 │   ├── index.js                        # Backend API server
 │   ├── dkbService.js                   # DKB API integration
@@ -270,7 +282,8 @@ docker-compose down
 ## Troubleshooting
 
 ### CSV Upload Issues
-- Ensure file uses semicolon (;) delimiter
+- Ensure the CSV is exported from DKB online banking
+- File should use semicolon (;) delimiter
 - Check date format is DD.MM.YY
 - Verify amount format uses comma for decimals
 
@@ -299,4 +312,4 @@ MIT License - See LICENSE file for details
 - Built with Vite, Chart.js, PapaParse, and date-fns
 - AI powered by Anthropic Claude
 - DKB integration powered by [dkb-robo](https://github.com/grindsa/dkb-robo)
-- Designed for German banking formats
+- Designed specifically for DKB (Deutsche Kreditbank) accounts
