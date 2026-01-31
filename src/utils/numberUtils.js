@@ -41,7 +41,7 @@ export function formatGermanNumber(num) {
 
 /**
  * Format number as currency (EUR)
- * @param {number} num - Number to format
+ * @param {number} num - Number to format (in euros, not cents)
  * @returns {string} - Formatted currency string
  */
 export function formatCurrency(num) {
@@ -53,4 +53,59 @@ export function formatCurrency(num) {
     style: 'currency',
     currency: 'EUR'
   });
+}
+
+/**
+ * Convert euros to cents (integer)
+ * @param {number} euros - Amount in euros (e.g., 20.50)
+ * @returns {number} - Amount in cents as integer (e.g., 2050)
+ */
+export function eurosToCents(euros) {
+  if (typeof euros !== 'number' || isNaN(euros)) {
+    return 0;
+  }
+  // Round to avoid floating point precision issues
+  return Math.round(euros * 100);
+}
+
+/**
+ * Convert cents to euros
+ * @param {number} cents - Amount in cents as integer (e.g., 2050)
+ * @returns {number} - Amount in euros (e.g., 20.50)
+ */
+export function centsToEuros(cents) {
+  if (typeof cents !== 'number' || isNaN(cents)) {
+    return 0;
+  }
+  return cents / 100;
+}
+
+/**
+ * Format cents as currency (EUR)
+ * @param {number} cents - Amount in cents as integer
+ * @returns {string} - Formatted currency string
+ */
+export function formatCentsAsCurrency(cents) {
+  return formatCurrency(centsToEuros(cents));
+}
+
+/**
+ * Parse euro input string to cents (handles both . and , as decimal separators)
+ * @param {string} input - User input string (e.g., "20", "20.50", "20,50")
+ * @returns {number} - Amount in cents as integer
+ */
+export function parseEuroInputToCents(input) {
+  if (!input || typeof input !== 'string') {
+    return 0;
+  }
+
+  // Normalize: replace comma with dot for decimal
+  const normalized = input.trim().replace(',', '.');
+  const euros = parseFloat(normalized);
+
+  if (isNaN(euros)) {
+    return 0;
+  }
+
+  return eurosToCents(euros);
 }

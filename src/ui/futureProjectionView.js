@@ -610,7 +610,7 @@ export class FutureProjectionView {
 
       <div class="form-group">
         <label>Amount (€)</label>
-        <input type="number" name="amount" step="0.01" required value="${Math.abs(item.amount)}">
+        <input type="number" name="amount" step="0.01" inputmode="decimal" required value="${Math.abs(item.amount).toFixed(2)}">
       </div>
 
       <div class="form-group">
@@ -747,7 +747,7 @@ export class FutureProjectionView {
 
       <div class="form-group">
         <label>Amount (€)</label>
-        <input type="number" name="amount" step="0.01" required value="${Math.abs(item.amount)}">
+        <input type="number" name="amount" step="0.01" inputmode="decimal" required value="${Math.abs(item.amount).toFixed(2)}">
       </div>
 
       <div class="form-group">
@@ -825,7 +825,7 @@ export class FutureProjectionView {
 
       <div class="form-group">
         <label>Amount (€)</label>
-        <input type="number" name="amount" step="0.01" required placeholder="0.00">
+        <input type="number" name="amount" step="0.01" inputmode="decimal" required placeholder="0.00">
       </div>
 
       <div class="form-group">
@@ -916,7 +916,7 @@ export class FutureProjectionView {
 
       <div class="form-group">
         <label>Amount (€)</label>
-        <input type="number" name="amount" step="0.01" required placeholder="0.00">
+        <input type="number" name="amount" step="0.01" inputmode="decimal" required placeholder="0.00">
       </div>
 
       <div class="form-group">
@@ -992,7 +992,7 @@ export class FutureProjectionView {
             type="number"
             class="monthly-override-input"
             data-month="${monthKey}"
-            step="0.01"
+            step="0.01" inputmode="decimal"
             value="${overrideAmount.toFixed(2)}"
             placeholder="${defaultAmount.toFixed(2)}"
           />

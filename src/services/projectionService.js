@@ -1,7 +1,12 @@
 import { addMonths, format, startOfMonth } from 'date-fns';
+import { eurosToCents, centsToEuros } from '../utils/numberUtils.js';
 
 /**
  * Projection service for managing future financial projections
+ *
+ * IMPORTANT: All amounts are stored internally as integers representing cents
+ * to avoid floating point precision issues. Use eurosToCents() when storing
+ * and centsToEuros() when displaying.
  */
 export class ProjectionService {
   constructor() {
@@ -36,25 +41,34 @@ export class ProjectionService {
    * Add a recurring item (income or expense)
    * @param {Object} item - Recurring item
    * @param {string} item.name - Name of the item
-   * @param {number} item.amount - Amount (positive for income, negative for expense)
+   * @param {number} item.amount - Amount in EUROS (positive for income, negative for expense)
    * @param {string} item.category - Category
    * @param {string} item.frequency - 'monthly', 'weekly', 'quarterly', 'yearly'
    * @param {Date} item.startDate - Start date
    * @param {Date} [item.endDate] - Optional end date
    * @param {boolean} item.isIncome - True if income, false if expense
-   * @param {Object} [item.monthlyOverrides] - Map of month (YYYY-MM) to custom amount
+   * @param {Object} [item.monthlyOverrides] - Map of month (YYYY-MM) to custom amount in EUROS
    */
   addRecurringItem(item) {
+    // Convert euros to cents for storage
+    const amountCents = eurosToCents(item.amount);
+    const overridesCents = {};
+    if (item.monthlyOverrides) {
+      Object.entries(item.monthlyOverrides).forEach(([month, amount]) => {
+        overridesCents[month] = eurosToCents(amount);
+      });
+    }
+
     const newItem = {
       id: this.generateId(),
       name: item.name,
-      amount: item.amount,
+      amountCents: amountCents,  // Store as cents
       category: item.category,
       frequency: item.frequency,
       startDate: item.startDate,
       endDate: item.endDate || null,
       isIncome: item.isIncome,
-      monthlyOverrides: item.monthlyOverrides || {},
+      monthlyOverridesCents: overridesCents,  // Store overrides as cents
       createdAt: new Date().toISOString()
     };
 
@@ -64,16 +78,63 @@ export class ProjectionService {
   }
 
   /**
+   * Get amount in euros for a recurring item (converts from internal cents)
+   * @param {Object} item - Recurring item
+   * @returns {number} Amount in euros
+   */
+  getAmountInEuros(item) {
+    // Support both old format (amount) and new format (amountCents)
+    if (item.amountCents !== undefined) {
+      return centsToEuros(item.amountCents);
+    }
+    return item.amount || 0;
+  }
+
+  /**
+   * Get monthly override in euros for a recurring item
+   * @param {Object} item - Recurring item
+   * @param {string} monthKey - Month key in YYYY-MM format
+   * @returns {number|null} Override amount in euros or null if no override
+   */
+  getMonthlyOverrideInEuros(item, monthKey) {
+    // Support both old format (monthlyOverrides) and new format (monthlyOverridesCents)
+    if (item.monthlyOverridesCents && monthKey in item.monthlyOverridesCents) {
+      return centsToEuros(item.monthlyOverridesCents[monthKey]);
+    }
+    if (item.monthlyOverrides && monthKey in item.monthlyOverrides) {
+      return item.monthlyOverrides[monthKey];
+    }
+    return null;
+  }
+
+  /**
    * Update a recurring item
    * @param {string} id - Item ID
-   * @param {Object} updates - Properties to update
+   * @param {Object} updates - Properties to update (amounts in EUROS)
    */
   updateRecurringItem(id, updates) {
     const index = this.recurringItems.findIndex(i => i.id === id);
     if (index >= 0) {
+      // Convert euros to cents for storage
+      const convertedUpdates = { ...updates };
+
+      if (updates.amount !== undefined) {
+        convertedUpdates.amountCents = eurosToCents(updates.amount);
+        delete convertedUpdates.amount;
+      }
+
+      if (updates.monthlyOverrides !== undefined) {
+        const overridesCents = {};
+        Object.entries(updates.monthlyOverrides).forEach(([month, amount]) => {
+          overridesCents[month] = eurosToCents(amount);
+        });
+        convertedUpdates.monthlyOverridesCents = overridesCents;
+        delete convertedUpdates.monthlyOverrides;
+      }
+
       this.recurringItems[index] = {
         ...this.recurringItems[index],
-        ...updates
+        ...convertedUpdates
       };
       console.log('[ProjectionService] Updated recurring item:', this.recurringItems[index]);
       return this.recurringItems[index];
@@ -85,16 +146,16 @@ export class ProjectionService {
    * Set monthly override for a recurring item
    * @param {string} id - Item ID
    * @param {string} month - Month in YYYY-MM format
-   * @param {number} amount - Override amount
+   * @param {number} amount - Override amount in EUROS
    */
   setMonthlyOverride(id, month, amount) {
     const item = this.recurringItems.find(i => i.id === id);
     if (item) {
-      if (!item.monthlyOverrides) {
-        item.monthlyOverrides = {};
+      if (!item.monthlyOverridesCents) {
+        item.monthlyOverridesCents = {};
       }
-      item.monthlyOverrides[month] = amount;
-      console.log(`[ProjectionService] Set override for ${item.name} in ${month}: ${amount}`);
+      item.monthlyOverridesCents[month] = eurosToCents(amount);
+      console.log(`[ProjectionService] Set override for ${item.name} in ${month}: ${amount} EUR (${eurosToCents(amount)} cents)`);
       return true;
     }
     return false;
@@ -118,7 +179,7 @@ export class ProjectionService {
    * Add a one-time item (future transaction)
    * @param {Object} item - One-time item
    * @param {string} item.name - Description
-   * @param {number} item.amount - Amount (positive for income, negative for expense)
+   * @param {number} item.amount - Amount in EUROS (positive for income, negative for expense)
    * @param {string} item.category - Category
    * @param {Date} item.date - Transaction date
    * @param {boolean} item.isIncome - True if income, false if expense
@@ -127,7 +188,7 @@ export class ProjectionService {
     const newItem = {
       id: this.generateId(),
       name: item.name,
-      amount: item.amount,
+      amountCents: eurosToCents(item.amount),  // Store as cents
       category: item.category,
       date: item.date,
       isIncome: item.isIncome,
@@ -172,10 +233,15 @@ export class ProjectionService {
     this.oneTimeItems.forEach(item => {
       const itemDate = new Date(item.date);
       if (itemDate >= startDate && itemDate <= endDate) {
+        // Get amount in euros (handles both old and new format)
+        const amountEuros = item.amountCents !== undefined
+          ? centsToEuros(item.amountCents)
+          : (item.amount || 0);
+
         projections.push({
           id: item.id,
           name: item.name,
-          amount: item.amount,
+          amount: amountEuros,  // Return euros for display/calculation
           category: item.category,
           date: itemDate,
           isIncome: item.isIncome,
@@ -196,7 +262,7 @@ export class ProjectionService {
    * @param {Object} item - Recurring item
    * @param {Date} startDate - Start date
    * @param {Date} endDate - End date
-   * @returns {Array} - Array of projected transactions
+   * @returns {Array} - Array of projected transactions (amounts in EUROS)
    */
   generateRecurringProjections(item, startDate, endDate) {
     const projections = [];
@@ -208,17 +274,17 @@ export class ProjectionService {
     while (currentDate <= endDate && currentDate <= itemEndDate) {
       const monthKey = format(currentDate, 'yyyy-MM');
 
-      // Check if there's a monthly override
-      const amount = item.monthlyOverrides && monthKey in item.monthlyOverrides
-        ? item.monthlyOverrides[monthKey]
-        : item.amount;
+      // Get amount in euros (handles both old and new format)
+      const overrideEuros = this.getMonthlyOverrideInEuros(item, monthKey);
+      const baseAmountEuros = this.getAmountInEuros(item);
+      const amountEuros = overrideEuros !== null ? overrideEuros : baseAmountEuros;
 
       // Only add if amount is not zero (allows skipping months)
-      if (amount !== 0) {
+      if (amountEuros !== 0) {
         projections.push({
           id: `${item.id}-${monthKey}`,
           name: item.name,
-          amount: amount,
+          amount: amountEuros,  // Return euros for display/calculation
           category: item.category,
           date: new Date(currentDate),
           isIncome: item.isIncome,
@@ -257,11 +323,29 @@ export class ProjectionService {
   }
 
   /**
-   * Get all recurring items
+   * Get all recurring items (with amounts converted to euros for display)
    * @returns {Array}
    */
   getRecurringItems() {
-    return [...this.recurringItems];
+    return this.recurringItems.map(item => {
+      // Convert cents to euros for external use
+      const result = { ...item };
+
+      // Convert amount
+      if (item.amountCents !== undefined) {
+        result.amount = centsToEuros(item.amountCents);
+      }
+
+      // Convert monthly overrides
+      if (item.monthlyOverridesCents) {
+        result.monthlyOverrides = {};
+        Object.entries(item.monthlyOverridesCents).forEach(([month, cents]) => {
+          result.monthlyOverrides[month] = centsToEuros(cents);
+        });
+      }
+
+      return result;
+    });
   }
 
   /**
@@ -281,11 +365,20 @@ export class ProjectionService {
   }
 
   /**
-   * Get all one-time items
+   * Get all one-time items (with amounts converted to euros for display)
    * @returns {Array}
    */
   getOneTimeItems() {
-    return [...this.oneTimeItems];
+    return this.oneTimeItems.map(item => {
+      const result = { ...item };
+
+      // Convert amount
+      if (item.amountCents !== undefined) {
+        result.amount = centsToEuros(item.amountCents);
+      }
+
+      return result;
+    });
   }
 
   /**
@@ -433,7 +526,7 @@ export class ProjectionService {
   }
 
   /**
-   * Get statistics
+   * Get statistics (amounts in euros)
    * @returns {Object}
    */
   getStats() {
@@ -447,10 +540,10 @@ export class ProjectionService {
       oneTimeItems: this.oneTimeItems.length,
       monthlyRecurringIncome: recurringIncome
         .filter(i => i.frequency === 'monthly')
-        .reduce((sum, i) => sum + i.amount, 0),
+        .reduce((sum, i) => sum + this.getAmountInEuros(i), 0),
       monthlyRecurringExpenses: recurringExpenses
         .filter(i => i.frequency === 'monthly')
-        .reduce((sum, i) => sum + Math.abs(i.amount), 0)
+        .reduce((sum, i) => sum + Math.abs(this.getAmountInEuros(i)), 0)
     };
   }
 
