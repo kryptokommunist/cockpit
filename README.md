@@ -14,6 +14,10 @@ Your personal financial command center for **Deutsche Kreditbank (DKB)** account
 ![Category Breakdown](screenshots/category-breakdown.png)
 *Analyze spending by category and track recurring expenses like subscriptions and utilities*
 
+### AI Categorization
+![AI Categorization](screenshots/ai-categorization.png)
+*Automatically categorize transactions using AI with batch processing and progress tracking*
+
 ### AI Financial Assistant
 ![AI Assistant](screenshots/ai-assistant.png)
 *Ask questions about your finances and get AI-powered insights and action items*
