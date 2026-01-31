@@ -1,4 +1,4 @@
-import { addMonths, format, startOfMonth } from 'date-fns';
+import { addMonths, addWeeks, format, startOfMonth } from 'date-fns';
 import { eurosToCents, centsToEuros } from '../utils/numberUtils.js';
 
 /**
@@ -310,7 +310,7 @@ export class ProjectionService {
   incrementDate(date, frequency) {
     switch (frequency) {
       case 'weekly':
-        return addMonths(date, 0.25);  // Approximate
+        return addWeeks(date, 1);  // Use addWeeks for proper weekly increment
       case 'monthly':
         return addMonths(date, 1);
       case 'quarterly':
