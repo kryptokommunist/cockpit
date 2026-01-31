@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import fetch from 'node-fetch';
+import { DKBService } from './dkbService.js';
 
 const app = express();
 const PORT = 3001;
@@ -9,6 +10,9 @@ const PORT = 3001;
 const ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL || 'http://host.docker.internal:9988/anthropic/';
 const ANTHROPIC_AUTH_TOKEN = process.env.ANTHROPIC_AUTH_TOKEN || 'sk-aB1cD2eF3gH4jK5lM6nP7qR8sT9uV0wX1yZ2bC3nM4pK5sL6';
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'anthropic--claude-4.5-sonnet';
+
+// Initialize DKB service
+const dkbService = new DKBService();
 
 // Enable CORS for frontend
 app.use(cors({
@@ -764,9 +768,213 @@ Your response:`;
   }
 });
 
+// ============================================================================
+// DKB Bank Integration Endpoints
+// ============================================================================
+
+// Fetch all data (accounts + transactions) in a single login
+app.post('/api/dkb/fetch-all', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+
+    console.log(`[DKB API] Fetching all data for user: ${username}`);
+
+    // Fetch all data in one login session (1095 days = ~3 years of history)
+    const result = await dkbService.fetchAllInOneSession(username, password, 1095);
+
+    res.json({
+      success: true,
+      accounts: result.accounts,
+      transactions: result.transactions
+    });
+  } catch (error) {
+    console.error('[DKB API] Error fetching all data:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Step 1: Authenticate and get available accounts
+app.post('/api/dkb/auth', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+
+    console.log(`[DKB API] Authenticating user: ${username}`);
+
+    const result = await dkbService.createConsentAndGetAccounts({ username, password });
+
+    res.json({
+      success: true,
+      session: result.session,
+      accounts: result.accounts,
+      username: result.username,
+      password: result.password
+    });
+  } catch (error) {
+    console.error('[DKB API] Error authenticating:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Step 2: Add selected account
+app.post('/api/dkb/accounts', async (req, res) => {
+  try {
+    const { session, selectedAccount, username, password } = req.body;
+
+    if (!session || !selectedAccount) {
+      return res.status(400).json({ error: 'Session and selected account are required' });
+    }
+
+    console.log(`[DKB API] Adding account: ${selectedAccount.iban}`);
+
+    const result = await dkbService.addAccountWithSelection({
+      session,
+      selectedAccount,
+      username,
+      password
+    });
+
+    res.json({
+      success: true,
+      account: result
+    });
+  } catch (error) {
+    console.error('[DKB API] Error adding account:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// List DKB accounts
+app.get('/api/dkb/accounts', (req, res) => {
+  try {
+    const accounts = dkbService.listAccounts();
+    res.json({
+      success: true,
+      accounts
+    });
+  } catch (error) {
+    console.error('[DKB API] Error listing accounts:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get account status
+app.get('/api/dkb/accounts/:accountId/status', (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const status = dkbService.getAccountStatus(accountId);
+
+    res.json({
+      success: true,
+      status
+    });
+  } catch (error) {
+    console.error('[DKB API] Error getting account status:', error);
+    res.status(404).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Fetch transactions from DKB
+app.post('/api/dkb/accounts/:accountId/transactions', async (req, res) => {
+  try {
+    const { accountId } = req.params;
+    const { startDate, endDate } = req.body;
+
+    console.log(`[DKB API] Fetching transactions for account: ${accountId}`);
+
+    const transactions = await dkbService.fetchTransactions(accountId, {
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined
+    });
+
+    res.json({
+      success: true,
+      transactions,
+      count: transactions.length
+    });
+  } catch (error) {
+    console.error('[DKB API] Error fetching transactions:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Remove DKB account
+app.delete('/api/dkb/accounts/:accountId', (req, res) => {
+  try {
+    const { accountId } = req.params;
+
+    console.log(`[DKB API] Removing account: ${accountId}`);
+    dkbService.removeAccount(accountId);
+
+    res.json({
+      success: true,
+      message: 'Account removed successfully'
+    });
+  } catch (error) {
+    console.error('[DKB API] Error removing account:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Parse DKB CSV (for manual upload scenario)
+app.post('/api/dkb/parse-csv', async (req, res) => {
+  try {
+    const { csvContent } = req.body;
+
+    if (!csvContent) {
+      return res.status(400).json({ error: 'CSV content is required' });
+    }
+
+    console.log('[DKB API] Parsing DKB CSV');
+
+    const transactions = dkbService.parseDKBCSV(csvContent);
+
+    res.json({
+      success: true,
+      transactions,
+      count: transactions.length
+    });
+  } catch (error) {
+    console.error('[DKB API] Error parsing CSV:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Backend server running on http://0.0.0.0:${PORT}`);
   console.log(`API Base URL: ${ANTHROPIC_BASE_URL}`);
   console.log(`Model: ${ANTHROPIC_MODEL}`);
+  console.log(`DKB integration endpoints available`);
 });

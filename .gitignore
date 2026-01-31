@@ -1,6 +1,10 @@
 # User data files
 settings.json
+
+# CSV data files
 *.csv
+ai-categorization.csv
+umsatz*.csv
 
 # Dependencies
 node_modules/
@@ -21,6 +25,3 @@ dist/
 
 # Logs
 *.log
-
-# User CSV files
-umsatz.csv

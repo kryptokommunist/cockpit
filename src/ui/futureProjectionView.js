@@ -1,5 +1,6 @@
-import { addMonths, format } from 'date-fns';
+import { addMonths, format, startOfMonth, startOfYear, endOfYear, eachMonthOfInterval } from 'date-fns';
 import { formatCurrency } from '../utils/numberUtils.js';
+import { MonthRangeSelector } from './monthRangeSelector.js';
 
 /**
  * Future Projection View Manager
@@ -10,6 +11,7 @@ export class FutureProjectionView {
     this.categorizer = categorizer;
     this.transactions = [];
     this.recurringData = null;
+    this.isReloading = false; // Flag to prevent infinite loops
     this.setupTabSwitching();
     this.setupAddButtons();
   }
@@ -17,15 +19,37 @@ export class FutureProjectionView {
   /**
    * Set transaction data for auto-population
    * @param {Array} transactions - Historical transactions
-   * @param {Object} recurringData - Detected recurring patterns
+   * @param {Object} recurringData - Detected recurring patterns (deprecated, now detected dynamically)
+   * @param {Object} recurringDetector - Recurring detector instance
    */
-  setTransactionData(transactions, recurringData) {
+  setTransactionData(transactions, recurringData, recurringDetector) {
     this.transactions = transactions;
     this.recurringData = recurringData;
+    this.recurringDetector = recurringDetector;
 
     // Calculate current balance
     this.currentBalance = transactions.reduce((sum, t) => sum + t.amount, 0);
     console.log(`[FutureProjectionView] Current balance: €${this.currentBalance.toFixed(2)}`);
+  }
+
+  /**
+   * Get filtered transactions based on recurring detection period
+   * @returns {Array} Filtered transactions
+   */
+  getFilteredTransactionsForPeriod() {
+    if (!this.transactions || this.transactions.length === 0) {
+      return [];
+    }
+
+    const { startDate, endDate } = this.projectionService.getRecurringDetectionDateRange();
+
+    const filtered = this.transactions.filter(t =>
+      t.bookingDate >= startDate && t.bookingDate <= endDate
+    );
+
+    console.log(`[FutureProjectionView] Filtered ${filtered.length} transactions from ${format(startDate, 'MMM yyyy')} - ${format(endDate, 'MMM yyyy')}`);
+
+    return filtered;
   }
 
   /**
@@ -40,39 +64,42 @@ export class FutureProjectionView {
 
     console.log('[FutureProjectionView] Auto-populating from overview data...');
 
+    // Get filtered transactions based on recurring detection period
+    const filteredTransactions = this.getFilteredTransactionsForPeriod();
+
+    // Detect recurring patterns on filtered transactions
+    const recurringExpenses = this.recurringDetector.detect(filteredTransactions, 'expense');
+    const recurringIncome = this.recurringDetector.detect(filteredTransactions, 'income');
+
+    console.log(`[FutureProjectionView] Detected ${recurringExpenses.length} recurring expenses and ${recurringIncome.length} recurring income from filtered period`);
+
     // Add recurring expenses
-    if (this.recurringData && this.recurringData.expenses) {
-      this.recurringData.expenses.forEach(pattern => {
-        this.projectionService.addRecurringItem({
-          name: pattern.merchant,
-          amount: -pattern.mostRecentAmount, // Use mostRecentAmount instead of averageAmount
-          category: pattern.category || 'OTHER',
-          frequency: pattern.frequency,
-          startDate: new Date(),
-          endDate: null,
-          isIncome: false
-        });
+    recurringExpenses.forEach(pattern => {
+      this.projectionService.addRecurringItem({
+        name: pattern.merchant,
+        amount: -pattern.mostRecentAmount,
+        category: pattern.category || 'OTHER',
+        frequency: pattern.frequency,
+        startDate: new Date(),
+        endDate: null,
+        isIncome: false
       });
-      console.log(`[FutureProjectionView] Added ${this.recurringData.expenses.length} recurring expenses`);
-    }
+    });
 
     // Add recurring income
-    if (this.recurringData && this.recurringData.income) {
-      this.recurringData.income.forEach(pattern => {
-        this.projectionService.addRecurringItem({
-          name: pattern.merchant,
-          amount: pattern.mostRecentAmount, // Use mostRecentAmount instead of averageAmount
-          category: pattern.category || 'OTHER_INCOME',
-          frequency: pattern.frequency,
-          startDate: new Date(),
-          endDate: null,
-          isIncome: true
-        });
+    recurringIncome.forEach(pattern => {
+      this.projectionService.addRecurringItem({
+        name: pattern.merchant,
+        amount: pattern.mostRecentAmount,
+        category: pattern.category || 'OTHER_INCOME',
+        frequency: pattern.frequency,
+        startDate: new Date(),
+        endDate: null,
+        isIncome: true
       });
-      console.log(`[FutureProjectionView] Added ${this.recurringData.income.length} recurring income`);
-    }
+    });
 
-    // Calculate and add category averages (3 months, excluding recurring)
+    // Calculate and add category averages (excluding recurring)
     this.addCategoryAverages();
 
     // Save projections
@@ -81,32 +108,34 @@ export class FutureProjectionView {
   }
 
   /**
-   * Calculate 3-month category averages and add as one-time items
+   * Calculate category averages and add as recurring items
    */
   addCategoryAverages() {
     if (!this.transactions || this.transactions.length === 0) {
       return;
     }
 
-    const now = new Date();
-    const threeMonthsAgo = new Date(now);
-    threeMonthsAgo.setMonth(now.getMonth() - 3);
+    const { startDate, endDate } = this.projectionService.getCategoryAveragesDateRange();
 
-    // Get transactions from last 3 months
+    // Get transactions from configured time period
     const recentTransactions = this.transactions.filter(t =>
-      t.bookingDate >= threeMonthsAgo
+      t.bookingDate >= startDate && t.bookingDate <= endDate
     );
 
-    // Get recurring merchant names to exclude
+    // Calculate number of months in the period
+    const periodMonths = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+      (endDate.getMonth() - startDate.getMonth()) + 1;
+
+    console.log(`[FutureProjectionView] Calculating category averages from ${format(startDate, 'MMM yyyy')} - ${format(endDate, 'MMM yyyy')} (${recentTransactions.length} transactions)`);
+
+    // Get recurring merchant names to exclude (from currently active projections)
     const recurringMerchants = new Set();
-    if (this.recurringData) {
-      if (this.recurringData.expenses) {
-        this.recurringData.expenses.forEach(p => recurringMerchants.add(p.merchant));
-      }
-      if (this.recurringData.income) {
-        this.recurringData.income.forEach(p => recurringMerchants.add(p.merchant));
-      }
-    }
+    const recurringItems = this.projectionService.getRecurringItems();
+    recurringItems.forEach(item => {
+      // Extract merchant name from item name (remove " (Avg)" suffix if present)
+      const merchantName = item.name.replace(/ \(Avg\)$/, '');
+      recurringMerchants.add(merchantName);
+    });
 
     // Calculate category totals excluding recurring items
     const categoryTotals = {};
@@ -139,7 +168,7 @@ export class FutureProjectionView {
     Object.entries(categoryTotals).forEach(([key, total]) => {
       const [category, type] = key.split('_');
       const count = categoryCounts[key];
-      const monthlyAverage = total / 3; // 3 months
+      const monthlyAverage = total / periodMonths; // Average over the period
 
       // Only add if meaningful amount
       if (monthlyAverage > 10) {
@@ -155,37 +184,65 @@ export class FutureProjectionView {
       }
     });
 
-    console.log('[FutureProjectionView] Added category averages');
+    console.log(`[FutureProjectionView] Added category averages from ${format(startDate, 'MMM yyyy')} - ${format(endDate, 'MMM yyyy')}`);
   }
 
   /**
    * Setup tab switching between Overview and Future
    */
   setupTabSwitching() {
-    const tabs = document.querySelectorAll('.main-tab');
-    const overviewView = document.getElementById('overview-view');
-    const futureView = document.getElementById('future-view');
+    // Tab switching is handled by main.js
+    // Just listen for when we switch to future view
+    window.addEventListener('view-changed', (event) => {
+      if (event.detail.view === 'future') {
+        // Update future projection when switching to it
+        this.updateProjection();
+      }
+    });
 
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        const view = tab.dataset.view;
+    // Listen for date range changes and auto-reload projections
+    window.addEventListener('reload-projections-from-date-change', async () => {
+      // Prevent infinite loops
+      if (this.isReloading) {
+        console.log('[FutureProjectionView] Already reloading, skipping...');
+        return;
+      }
 
-        // Update active tab
-        tabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
+      // Don't reload if we don't have any transaction data
+      if (!this.transactions || this.transactions.length === 0) {
+        console.log('[FutureProjectionView] No transaction data available, skipping reload');
+        return;
+      }
 
-        // Switch views
-        if (view === 'overview') {
-          overviewView.classList.add('active');
-          futureView.classList.remove('active');
-        } else if (view === 'future') {
-          overviewView.classList.remove('active');
-          futureView.classList.add('active');
+      console.log('[FutureProjectionView] Date range changed, reloading projections...');
 
-          // Update future projection when switching to it
-          this.updateProjection();
+      try {
+        // Set flag inside try block so finally always runs
+        this.isReloading = true;
+
+        // Show confirmation
+        if (!confirm('Date range updated. Reload projections with new settings? This will recalculate based on the selected time period.')) {
+          console.log('[FutureProjectionView] User cancelled reload');
+          return;
         }
-      });
+
+        // Clear all projections
+        this.projectionService.clearAll();
+
+        // Re-populate from overview with new date ranges
+        await this.autoPopulateFromOverview();
+
+        // Update display
+        this.updateProjection();
+
+        console.log('[FutureProjectionView] Projections reloaded with new date ranges');
+      } catch (error) {
+        console.error('[FutureProjectionView] Error reloading projections:', error);
+        alert('Error reloading projections: ' + error.message);
+      } finally {
+        // Always reset the flag, even if user cancels
+        this.isReloading = false;
+      }
     });
   }
 
@@ -251,30 +308,42 @@ export class FutureProjectionView {
    * Reload projections from overview data
    */
   async reloadProjectionsFromOverview() {
+    if (this.isReloading) {
+      console.log('[FutureProjectionView] Already reloading, skipping...');
+      return;
+    }
+
     if (!confirm('This will clear all current projections and reload from overview data. Continue?')) {
       return;
     }
 
+    this.isReloading = true;
     console.log('[FutureProjectionView] Reloading projections from overview...');
 
-    // Clear all projections
-    this.projectionService.clearAll();
+    try {
+      // Clear all projections
+      this.projectionService.clearAll();
 
-    // Re-populate from overview
-    await this.autoPopulateFromOverview();
+      // Re-populate from overview
+      await this.autoPopulateFromOverview();
 
-    // Update display
-    this.updateProjection();
+      // Update display
+      this.updateProjection();
 
-    alert('Projections reloaded successfully!');
+      alert('Projections reloaded successfully!');
+    } finally {
+      // Always reset the flag
+      this.isReloading = false;
+    }
   }
 
   /**
    * Update projection display
    */
   updateProjection() {
-    const startDate = new Date();
-    const endDate = addMonths(startDate, 12);
+    const now = new Date();
+    const startDate = startOfYear(now);
+    const endDate = endOfYear(now);
 
     // Generate projections
     const projections = this.projectionService.generateProjections(startDate, endDate);
@@ -418,21 +487,23 @@ export class FutureProjectionView {
    * Render sparkline graph for item with overrides
    */
   renderSparkline(item) {
-    const startDate = new Date();
+    const now = new Date();
+    const startDate = startOfYear(now);
+    const endDate = endOfYear(now);
     const values = [];
     const baseAmount = Math.abs(item.amount);
 
-    // Get values for next 12 months
-    for (let i = 0; i < 12; i++) {
-      const month = addMonths(startDate, i);
+    // Get values for all months in current year
+    const months = eachMonthOfInterval({ start: startDate, end: endDate });
+    months.forEach(month => {
       const monthKey = format(month, 'yyyy-MM');
 
-      const amount = item.monthlyOverrides && item.monthlyOverrides[monthKey]
+      const amount = item.monthlyOverrides && monthKey in item.monthlyOverrides
         ? Math.abs(item.monthlyOverrides[monthKey])
         : baseAmount;
 
       values.push(amount);
-    }
+    });
 
     // Calculate min/max for scaling
     const min = Math.min(...values);
@@ -467,7 +538,7 @@ export class FutureProjectionView {
             return `<circle cx="${x}" cy="${y}" r="2" fill="currentColor"/>`;
           }).join('')}
         </svg>
-        <span class="sparkline-label">12-month variation</span>
+        <span class="sparkline-label">Year variation</span>
       </div>
     `;
   }
@@ -896,19 +967,21 @@ export class FutureProjectionView {
   }
 
   /**
-   * Render monthly overrides for next 12 months
+   * Render monthly overrides for all months in current year
    */
   renderMonthlyOverrides(item) {
-    const startDate = new Date();
+    const now = new Date();
+    const startDate = startOfYear(now);
+    const endDate = endOfYear(now);
     const months = [];
 
-    for (let i = 0; i < 12; i++) {
-      const month = addMonths(startDate, i);
+    const yearMonths = eachMonthOfInterval({ start: startDate, end: endDate });
+    yearMonths.forEach(month => {
       const monthKey = format(month, 'yyyy-MM');
       const monthLabel = format(month, 'MMM yyyy');
 
       const defaultAmount = Math.abs(item.amount);
-      const overrideAmount = item.monthlyOverrides && item.monthlyOverrides[monthKey]
+      const overrideAmount = item.monthlyOverrides && monthKey in item.monthlyOverrides
         ? Math.abs(item.monthlyOverrides[monthKey])
         : defaultAmount;
 
@@ -925,7 +998,7 @@ export class FutureProjectionView {
           />
         </div>
       `);
-    }
+    });
 
     return months.join('');
   }

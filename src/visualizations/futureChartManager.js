@@ -1,6 +1,7 @@
 import Chart from 'chart.js/auto';
 import { formatCurrency } from '../utils/numberUtils.js';
-import { format, startOfMonth, eachMonthOfInterval, addMonths } from 'date-fns';
+import { format, startOfMonth, startOfYear, endOfYear, eachMonthOfInterval, addMonths } from 'date-fns';
+import { MonthRangeSelector } from '../ui/monthRangeSelector.js';
 
 /**
  * Future Chart Manager - manages projected charts
@@ -64,10 +65,12 @@ export class FutureChartManager {
    * Create timeline chart (bars for income/expenses, line for balance)
    */
   createTimelineChart(canvas) {
-    const startDate = new Date();
+    const now = new Date();
+    const startDate = startOfYear(now);
+    const endDate = endOfYear(now);
     const months = eachMonthOfInterval({
       start: startDate,
-      end: addMonths(startDate, 11)
+      end: endDate
     });
 
     const labels = months.map(d => format(d, 'MMM yyyy'));
@@ -179,10 +182,12 @@ export class FutureChartManager {
   updateTimelineChart() {
     if (!this.timelineChart) return;
 
-    const startDate = new Date();
+    const now = new Date();
+    const startDate = startOfYear(now);
+    const endDate = endOfYear(now);
     const months = eachMonthOfInterval({
       start: startDate,
-      end: addMonths(startDate, 11)
+      end: endDate
     });
 
     // Calculate cumulative balance starting from current balance
@@ -301,7 +306,7 @@ export class FutureChartManager {
   }
 
   /**
-   * Setup category selectors (groupby dropdown)
+   * Setup category selectors (groupby dropdown and date range)
    */
   setupCategorySelectors(canvas) {
     const container = canvas.parentElement;
@@ -323,6 +328,7 @@ export class FutureChartManager {
           </select>
         </label>
       </div>
+      <div class="category-date-range" id="category-date-range"></div>
     `;
 
     container.insertBefore(selectorsContainer, canvas);
@@ -332,6 +338,24 @@ export class FutureChartManager {
       this.categoryGroupBy = e.target.value;
       this.updateCategoryChart();
     });
+
+    // Add month range selector for category averages
+    const dateRangeContainer = selectorsContainer.querySelector('#category-date-range');
+    const settings = this.projectionService.getTimePeriodSettings();
+
+    this.categoryRangeSelector = new MonthRangeSelector(
+      dateRangeContainer,
+      'Category Averages Period',
+      settings.categoryAverages,
+      (range) => {
+        console.log('[FutureChartManager] Category range selector onChange fired');
+        this.projectionService.setCategoryAveragesPeriod(range);
+        console.log('[FutureChartManager] Category period updated, triggering projection reload');
+        // Trigger projection reload
+        window.dispatchEvent(new CustomEvent('reload-projections-from-date-change'));
+      }
+    );
+    console.log('[FutureChartManager] Category range selector initialized');
   }
 
   /**
@@ -589,6 +613,47 @@ export class FutureChartManager {
         this.updateRecurringChart();
       });
     });
+
+    // Setup recurring detection date range selector
+    this.setupRecurringSelectors(canvas);
+  }
+
+  /**
+   * Setup recurring selectors (date range)
+   */
+  setupRecurringSelectors(canvas) {
+    const container = canvas.parentElement;
+
+    // Check if selectors already exist
+    if (container.querySelector('.recurring-selectors')) {
+      return;
+    }
+
+    const selectorsContainer = document.createElement('div');
+    selectorsContainer.className = 'recurring-selectors';
+    selectorsContainer.innerHTML = `
+      <div class="recurring-date-range" id="recurring-date-range"></div>
+    `;
+
+    container.insertBefore(selectorsContainer, canvas);
+
+    // Add month range selector for recurring detection
+    const dateRangeContainer = selectorsContainer.querySelector('#recurring-date-range');
+    const settings = this.projectionService.getTimePeriodSettings();
+
+    this.recurringRangeSelector = new MonthRangeSelector(
+      dateRangeContainer,
+      'Recurring Detection Period',
+      settings.recurringDetection,
+      (range) => {
+        console.log('[FutureChartManager] Recurring range selector onChange fired');
+        this.projectionService.setRecurringDetectionPeriod(range);
+        console.log('[FutureChartManager] Recurring detection period updated, triggering projection reload');
+        // Trigger projection reload
+        window.dispatchEvent(new CustomEvent('reload-projections-from-date-change'));
+      }
+    );
+    console.log('[FutureChartManager] Recurring range selector initialized');
   }
 
   /**

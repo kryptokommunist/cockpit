@@ -26,17 +26,20 @@
       </div>
     </header>
 
-    <main>
+    <!-- Sidebar Container -->
+    <div id="sidebar-container"></div>
+
+    <main class="main-with-sidebar">
       <!-- File Upload Section -->
       <section id="upload-section" class="card">
-        <h2>Upload CSV File</h2>
+        <h2>Load Data</h2>
         <div id="file-upload-container"></div>
         <div id="upload-status"></div>
       </section>
 
       <!-- Dashboard (hidden initially) -->
       <div id="dashboard" class="hidden">
-        <!-- Main tabs -->
+        <!-- Dashboard tabs -->
         <div class="main-tabs">
           <button class="main-tab active" data-view="overview">Overview</button>
           <button class="main-tab" data-view="future">Future Projection</button>
@@ -108,11 +111,6 @@
           <div id="filters-container"></div>
           <div id="transaction-list-container"></div>
         </section>
-
-        <!-- Settings Section -->
-        <section id="settings-section" class="card">
-          <div id="settings-container"></div>
-        </section>
         </div>
         <!-- End Overview View -->
 
@@ -173,6 +171,21 @@
         </div>
         <!-- End Future View -->
       </div>
+
+      <!-- Settings View (separate from dashboard) -->
+      <div id="settings-view" class="page-view">
+        <section class="card">
+          <h2>Data Source</h2>
+          <p class="section-description">Manage your data sources and load transaction data.</p>
+          <div id="settings-upload-container"></div>
+          <div id="settings-upload-status"></div>
+        </section>
+
+        <section class="card">
+          <div id="settings-container"></div>
+        </section>
+      </div>
+      <!-- End Settings View -->
     </main>
 
     <footer>

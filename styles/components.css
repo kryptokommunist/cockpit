@@ -1,6 +1,16 @@
 /* File Upload Component */
+.upload-options {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
 .file-upload {
   text-align: center;
+  flex: 1;
+  min-width: 300px;
 }
 
 .file-upload input[type="file"] {
@@ -46,6 +56,641 @@
   font-size: 0.9rem !important;
   color: var(--text-secondary) !important;
   margin-top: 0.5rem;
+}
+
+/* Upload Divider */
+.upload-divider {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.upload-divider::before,
+.upload-divider::after {
+  content: '';
+  width: 1px;
+  height: 40px;
+  background: var(--border-color);
+  margin: 0.5rem 0;
+}
+
+/* DKB Connect */
+.dkb-connect {
+  text-align: center;
+  flex: 1;
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.btn-dkb {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  min-width: 300px;
+  justify-content: center;
+}
+
+.btn-dkb svg {
+  flex-shrink: 0;
+}
+
+.dkb-hint {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  max-width: 300px;
+}
+
+/* DKB Saved Account */
+.dkb-saved-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 1.5rem;
+  background: var(--card-background);
+  border: 2px solid var(--success-color);
+  border-radius: 8px;
+  min-width: 400px;
+  flex: 1;
+}
+
+.saved-account-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.saved-account-info svg {
+  color: var(--success-color);
+}
+
+.saved-account-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.saved-account-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.saved-account-iban {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.saved-account-sync {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.saved-account-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.saved-account-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-small {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+}
+
+/* DKB Modal Account Selection */
+.account-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  transition: all 0.2s;
+}
+
+.account-item:hover {
+  border-color: var(--primary-color);
+  background: rgba(33, 150, 243, 0.05);
+}
+
+.account-item.selected {
+  border-color: var(--success-color);
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.account-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.account-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.account-iban {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.account-balance {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.account-transactions {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.btn-select-account {
+  min-width: 100px;
+}
+
+.btn-select-account.selected {
+  background: var(--success-color);
+  border-color: var(--success-color);
+}
+
+.btn-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* DKB Modal */
+.dkb-modal .modal-content {
+  max-width: 500px;
+}
+
+.dkb-info {
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+
+.dkb-warning {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 4px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  color: #856404;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.dkb-warning strong {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.dkb-form .form-group {
+  margin-bottom: 1.25rem;
+}
+
+.dkb-form label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.dkb-form input[type="text"],
+.dkb-form input[type="password"] {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.dkb-form input[type="text"]:focus,
+.dkb-form input[type="password"]:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+}
+
+.dkb-form .form-help {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.account-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: white;
+  transition: all 0.2s;
+}
+
+.account-item:hover {
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.account-info {
+  flex: 1;
+}
+
+.account-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.account-iban {
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.account-balance {
+  font-size: 0.9rem;
+  color: var(--success-color);
+  font-weight: 500;
+  margin-top: 0.25rem;
+}
+
+.btn-select-account {
+  margin-left: 1rem;
+  white-space: nowrap;
+}
+
+.dkb-features {
+  background: var(--background-secondary);
+  border-radius: 4px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dkb-features h4 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.dkb-features ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dkb-features li {
+  padding: 0.4rem 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.error-message {
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  color: #721c24;
+  padding: 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.btn-connect .btn-loading {
+  display: none;
+}
+
+.btn-connect:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Projection Controls */
+.projection-controls {
+  margin-bottom: 2rem;
+}
+
+.projection-settings-panel {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: var(--shadow);
+}
+
+.projection-settings-panel h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.projection-settings-panel .settings-description {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.settings-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.setting-item {
+  flex: 1;
+  min-width: 200px;
+}
+
+.setting-item label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.setting-help {
+  cursor: help;
+  color: var(--primary-color);
+  font-size: 0.9rem;
+  margin-left: 0.25rem;
+}
+
+.setting-select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 1rem;
+  background-color: white;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.setting-select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+}
+
+.setting-select:hover {
+  border-color: var(--primary-color);
+}
+
+.btn-reload-projections {
+  white-space: nowrap;
+  align-self: flex-end;
+}
+
+/* Month Range Selector */
+.month-range-selector {
+  margin: 1rem 0;
+}
+
+.month-range-selector.collapsible {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: white;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.range-toggle-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: white;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.range-toggle-btn:hover {
+  background: #f8f9fa;
+}
+
+.range-toggle-btn:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+.range-toggle-btn.expanded {
+  background: #f8f9fa;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.range-toggle-icon {
+  font-size: 1.1rem;
+}
+
+.range-toggle-text {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.range-current-value {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.range-toggle-arrow {
+  color: var(--primary-color);
+  font-size: 0.75rem;
+  transition: transform 0.2s ease;
+}
+
+.range-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem;
+  background: #f8f9fa;
+  max-height: 500px;
+  opacity: 1;
+  transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease;
+}
+
+.range-inputs.collapsed {
+  max-height: 0;
+  opacity: 0;
+  padding: 0 1rem;
+  overflow: hidden;
+}
+
+.range-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 180px;
+}
+
+.input-sublabel {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.month-year-picker {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.month-select,
+.year-select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background-color: white;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.month-select {
+  flex: 1;
+  min-width: 80px;
+}
+
+.year-select {
+  width: 90px;
+}
+
+.month-select:focus,
+.year-select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+}
+
+.month-select:hover,
+.year-select:hover {
+  border-color: var(--primary-color);
+}
+
+.range-separator {
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 1.2rem;
+  align-self: flex-end;
+  padding-bottom: 0.5rem;
+}
+
+.range-error {
+  display: none;
+  color: #d32f2f;
+  background-color: #ffebee;
+  border: 1px solid #ef9a9a;
+  padding: 0.5rem;
+  border-radius: 4px;
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+/* Category and Recurring Selectors */
+.category-selectors,
+.recurring-selectors {
+  margin-bottom: 1.5rem;
+}
+
+.category-selector-row {
+  margin-bottom: 1rem;
+}
+
+.category-selector-row label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.category-selector-row select {
+  margin-left: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background-color: white;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .settings-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .setting-item {
+    min-width: 100%;
+  }
+
+  .btn-reload-projections {
+    width: 100%;
+  }
+
+  .range-inputs {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .range-separator {
+    display: none;
+  }
+
+  .range-input-group {
+    min-width: 100%;
+  }
+
+  .range-toggle-btn {
+    font-size: 0.85rem;
+  }
+
+  .range-current-value {
+    font-size: 0.75rem;
+  }
 }
 
 #upload-status {

@@ -6,9 +6,12 @@ import { BudgetCalculator } from './services/budgetCalculator.js';
 import { CategorizationStorage } from './services/categorizationStorage.js';
 import { RecategorizationService } from './services/recategorizationService.js';
 import { ProjectionService } from './services/projectionService.js';
+import { DKBService } from './services/dkbService.js';
 import { ChartManager } from './visualizations/chartManager.js';
 import { FutureChartManager } from './visualizations/futureChartManager.js';
 import { FileUpload } from './ui/fileUpload.js';
+import { DKBModal } from './ui/dkbModal.js';
+import { Sidebar } from './ui/sidebar.js';
 import { TransactionList } from './ui/transactionList.js';
 import { Filters } from './ui/filters.js';
 import { BudgetView } from './ui/budgetView.js';
@@ -18,6 +21,7 @@ import { TopMerchants } from './ui/topMerchants.js';
 import { SettingsView } from './ui/settingsView.js';
 import { RecategorizeModal } from './ui/recategorizeModal.js';
 import { FutureProjectionView } from './ui/futureProjectionView.js';
+import { Transaction } from './models/Transaction.js';
 import { formatCurrency } from './utils/numberUtils.js';
 
 /**
@@ -35,6 +39,7 @@ class App {
     this.categorizationStorage = new CategorizationStorage();
     this.recategorizationService = new RecategorizationService();
     this.projectionService = new ProjectionService();
+    this.dkbService = new DKBService();
     this.chartManager = null;
     this.futureChartManager = null;
     this.transactionList = null;
@@ -46,6 +51,11 @@ class App {
     this.settingsView = null;
     this.recategorizeModal = null;
     this.futureProjectionView = null;
+    this.dkbModal = null;
+    this.sidebar = null;
+    this.settingsFileUpload = null;
+    this.currentPage = 'dashboard'; // dashboard or settings
+    this.currentTab = 'overview'; // overview or future (within dashboard)
 
     this.init();
   }
@@ -80,14 +90,104 @@ class App {
     // Setup event listeners
     this.setupEventListeners();
 
-    // Initialize file upload
-    const uploadContainer = document.getElementById('file-upload-container');
-    new FileUpload(uploadContainer, (file) => this.handleFileUpload(file));
+    // Initialize sidebar (always available)
+    const sidebarContainer = document.getElementById('sidebar-container');
+    this.sidebar = new Sidebar(sidebarContainer, (view) => this.handleNavigation(view));
 
-    // Try to auto-load umsatz.csv
-    await this.tryAutoLoadCSV();
+    // Initialize file upload for initial screen
+    const uploadContainer = document.getElementById('file-upload-container');
+    new FileUpload(
+      uploadContainer,
+      (file) => this.handleFileUpload(file),
+      () => this.handleDKBConnect()
+    );
+
+    // Initialize file upload for settings page (will be used after data is loaded)
+    const settingsUploadContainer = document.getElementById('settings-upload-container');
+    this.settingsFileUpload = new FileUpload(
+      settingsUploadContainer,
+      (file) => this.handleFileUpload(file),
+      () => this.handleDKBConnect()
+    );
+
+    // Try to load saved DKB transactions first, then fall back to CSV
+    const loadedFromDKB = await this.tryLoadSavedDKBData();
+    if (!loadedFromDKB) {
+      await this.tryAutoLoadCSV();
+    }
 
     console.log('App initialized');
+  }
+
+  /**
+   * Try to load saved DKB transactions from localStorage
+   */
+  async tryLoadSavedDKBData() {
+    try {
+      const savedTransactions = DKBModal.getSavedTransactions();
+      const savedCredentials = DKBModal.getSavedCredentials();
+      const lastSync = DKBModal.getLastSyncTime();
+
+      if (savedTransactions && savedTransactions.length > 0) {
+        console.log(`[App] Loading ${savedTransactions.length} saved DKB transactions from localStorage`);
+
+        // Convert saved data to Transaction objects
+        this.transactions = savedTransactions.map(t => new Transaction({
+          bookingDate: new Date(t.bookingDate),
+          valueDate: new Date(t.valueDate),
+          payee: t.payee,
+          purpose: t.purpose,
+          accountNumber: t.accountNumber || '',
+          bankCode: t.bankCode || '',
+          amount: t.amount,
+          currency: t.currency || 'EUR'
+        }));
+
+        // Process transactions
+        await this.processTransactions();
+
+        // Show notification with last sync time
+        const syncDate = lastSync ? new Date(lastSync).toLocaleString() : 'unknown';
+        this.showNotification(`Loaded ${this.transactions.length} transactions from DKB (last sync: ${syncDate})`, 'success');
+
+        return true;
+      }
+    } catch (error) {
+      console.error('[App] Error loading saved DKB data:', error);
+    }
+    return false;
+  }
+
+  /**
+   * Refresh DKB transactions using saved credentials
+   */
+  async refreshDKBTransactions() {
+    const credentials = DKBModal.getSavedCredentials();
+    if (!credentials) {
+      this.showNotification('No saved DKB credentials found', 'error');
+      return;
+    }
+
+    try {
+      this.showNotification('Refreshing DKB data... Please confirm on your app', 'info');
+
+      const result = await this.dkbService.fetchAllData(credentials.username, credentials.password);
+
+      // Filter transactions for the saved account
+      const accountTransactions = result.transactions.filter(t => t.accountId === credentials.account.id);
+
+      // Save new transactions
+      localStorage.setItem('dkb_transactions', JSON.stringify(accountTransactions));
+      localStorage.setItem('dkb_last_sync', new Date().toISOString());
+
+      // Process transactions
+      await this.handleDKBTransactions(accountTransactions, credentials.account);
+
+      this.showNotification(`Refreshed ${accountTransactions.length} transactions from DKB`, 'success');
+    } catch (error) {
+      console.error('[App] Error refreshing DKB data:', error);
+      this.showNotification(`Error refreshing DKB data: ${error.message}`, 'error');
+    }
   }
 
   async tryAutoLoadCSV() {
@@ -98,8 +198,24 @@ class App {
       const response = await fetch('umsatz.csv');
 
       if (response.ok) {
+        // Check content-type to ensure it's actually a CSV file
+        // Vite dev server returns index.html (text/html) for non-existent files
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('text/html')) {
+          console.log('umsatz.csv not found (received HTML fallback), waiting for manual upload');
+          this.showNotification('No CSV file found. Please upload a file or connect to DKB.', 'info');
+          return;
+        }
+
         console.log('Found umsatz.csv, loading...');
         const csvText = await response.text();
+
+        // Additional check: verify it looks like CSV content (not HTML)
+        if (csvText.trim().startsWith('<!DOCTYPE') || csvText.trim().startsWith('<html')) {
+          console.log('umsatz.csv not found (received HTML content), waiting for manual upload');
+          this.showNotification('No CSV file found. Please upload a file or connect to DKB.', 'info');
+          return;
+        }
 
         // Create a File object from the text
         const blob = new Blob([csvText], { type: 'text/csv' });
@@ -111,10 +227,64 @@ class App {
         this.showNotification('Automatically loaded umsatz.csv', 'success');
       } else {
         console.log('umsatz.csv not found, waiting for manual upload');
+        this.showNotification('No CSV file found. Please upload a file or connect to DKB.', 'info');
       }
     } catch (error) {
       console.log('Could not auto-load umsatz.csv:', error.message);
-      // Silently fail - user can upload manually
+      this.showNotification('No CSV file found. Please upload a file or connect to DKB.', 'info');
+    }
+  }
+
+  /**
+   * Handle DKB account connection
+   */
+  handleDKBConnect() {
+    console.log('[App] Opening DKB connection modal');
+
+    this.dkbModal = new DKBModal(
+      this.dkbService,
+      (transactions, account) => this.handleDKBTransactions(transactions, account)
+    );
+
+    this.dkbModal.show();
+  }
+
+  /**
+   * Handle transactions from DKB
+   */
+  async handleDKBTransactions(transactionsData, account) {
+    try {
+      console.log('[App] Processing DKB transactions:', transactionsData.length);
+
+      const hadPreviousData = this.transactions.length > 0;
+
+      // Convert DKB transaction data to Transaction objects
+      // This REPLACES any existing CSV data
+      this.transactions = transactionsData.map(t => new Transaction({
+        bookingDate: new Date(t.bookingDate),
+        valueDate: new Date(t.valueDate),
+        payee: t.payee,
+        purpose: t.purpose,
+        accountNumber: t.accountNumber,
+        bankCode: t.bankCode,
+        amount: t.amount,
+        currency: t.currency
+      }));
+
+      console.log(`Converted ${this.transactions.length} transactions`);
+
+      // Process transactions
+      await this.processTransactions();
+
+      // Notify user
+      if (hadPreviousData) {
+        this.showNotification(`Loaded ${this.transactions.length} transactions from DKB (replaced previous data)`, 'success');
+      } else {
+        this.showNotification(`Loaded ${this.transactions.length} transactions from DKB`, 'success');
+      }
+    } catch (error) {
+      console.error('[App] Error processing DKB transactions:', error);
+      this.showNotification(`Error: ${error.message}`, 'error');
     }
   }
 
@@ -125,59 +295,77 @@ class App {
       this.transactions = await this.csvParser.parse(file);
       console.log(`Parsed ${this.transactions.length} transactions`);
 
-      // Categorize transactions
-      console.log('Categorizing transactions...');
-      this.categorizer.categorizeAll(this.transactions, this.settingsManager.settings);
-      console.log('Categorization complete');
-
-      // Load and apply AI categorizations if available
-      console.log('Loading AI categorizations...');
-      await this.categorizationStorage.load();
-      const appliedCount = this.categorizationStorage.applyCategorizations(this.transactions);
-      if (appliedCount > 0) {
-        console.log(`Applied ${appliedCount} AI categorizations from previous session`);
-        this.showNotification(`Applied ${appliedCount} saved AI categorizations`, 'success');
-      }
-
-      // Apply recategorization rules
-      console.log('Applying recategorization rules...');
-      const recategorizedCount = this.recategorizationService.applyRules(this.transactions);
-      if (recategorizedCount > 0) {
-        console.log(`Applied ${recategorizedCount} recategorization rules`);
-        this.showNotification(`Applied ${recategorizedCount} recategorization rules`, 'success');
-      }
-
-      // Apply filters (initially show all)
-      this.filteredTransactions = [...this.transactions];
-
-      // Detect recurring patterns (expenses and income)
-      console.log('Detecting recurring patterns...');
-      const recurringExpenses = this.recurringDetector.detect(this.transactions, 'expense');
-      const recurringIncome = this.recurringDetector.detect(this.transactions, 'income');
-      console.log(`Detected ${recurringExpenses.length} recurring expenses and ${recurringIncome.length} recurring income`);
-
-      // Set transaction data for future projection view
-      const recurringData = { expenses: recurringExpenses, income: recurringIncome };
-      this.futureProjectionView.setTransactionData(this.transactions, recurringData);
-
-      // Auto-populate projections from overview data (only first time)
-      await this.futureProjectionView.autoPopulateFromOverview();
-
-      // Show dashboard
-      this.showDashboard();
-
-      // Initialize UI components
-      this.initializeComponents();
-
-      // Update all views
-      this.updateAllViews();
+      // Process transactions (common logic for CSV and DKB)
+      await this.processTransactions();
     } catch (error) {
       console.error('Error handling file upload:', error);
       throw error;
     }
   }
 
+  /**
+   * Process transactions (common logic for CSV and DKB)
+   */
+  async processTransactions() {
+    // Categorize transactions
+    console.log('Categorizing transactions...');
+    this.categorizer.categorizeAll(this.transactions, this.settingsManager.settings);
+    console.log('Categorization complete');
+
+    // Load and apply AI categorizations if available
+    console.log('Loading AI categorizations...');
+    await this.categorizationStorage.load();
+    const appliedCount = this.categorizationStorage.applyCategorizations(this.transactions);
+    if (appliedCount > 0) {
+      console.log(`Applied ${appliedCount} AI categorizations from previous session`);
+      this.showNotification(`Applied ${appliedCount} saved AI categorizations`, 'success');
+    }
+
+    // Apply recategorization rules
+    console.log('Applying recategorization rules...');
+    const recategorizedCount = this.recategorizationService.applyRules(this.transactions);
+    if (recategorizedCount > 0) {
+      console.log(`Applied ${recategorizedCount} recategorization rules`);
+      this.showNotification(`Applied ${recategorizedCount} recategorization rules`, 'success');
+    }
+
+    // Apply filters (initially show all)
+    this.filteredTransactions = [...this.transactions];
+
+    // Detect recurring patterns (expenses and income)
+    console.log('Detecting recurring patterns...');
+    const recurringExpenses = this.recurringDetector.detect(this.transactions, 'expense');
+    const recurringIncome = this.recurringDetector.detect(this.transactions, 'income');
+    console.log(`Detected ${recurringExpenses.length} recurring expenses and ${recurringIncome.length} recurring income`);
+
+    // Set transaction data for future projection view
+    const recurringData = { expenses: recurringExpenses, income: recurringIncome };
+    this.futureProjectionView.setTransactionData(this.transactions, recurringData, this.recurringDetector);
+
+    // Auto-populate projections from overview data (only first time)
+    await this.futureProjectionView.autoPopulateFromOverview();
+
+    // Show dashboard
+    this.showDashboard();
+
+    // Initialize UI components
+    this.initializeComponents();
+
+    // Update all views
+    this.updateAllViews();
+  }
+
   setupEventListeners() {
+    // Listen for DKB refresh request
+    window.addEventListener('dkb-refresh-requested', () => {
+      this.refreshDKBTransactions();
+    });
+
+    // Listen for DKB disconnect
+    window.addEventListener('dkb-disconnected', () => {
+      this.showNotification('DKB account disconnected', 'info');
+    });
+
     // Listen for recategorize modal request
     window.addEventListener('show-recategorize-modal', (event) => {
       const { transaction } = event.detail;
@@ -196,9 +384,107 @@ class App {
     });
   }
 
+  /**
+   * Handle navigation from sidebar (page-level navigation)
+   */
+  handleNavigation(page) {
+    console.log('[App] Navigating to page:', page);
+    this.currentPage = page;
+
+    const dashboard = document.getElementById('dashboard');
+    const settingsView = document.getElementById('settings-view');
+
+    if (page === 'dashboard') {
+      // Show dashboard (with tabs)
+      if (dashboard) {
+        dashboard.classList.remove('hidden');
+        dashboard.style.display = 'block';
+      }
+      if (settingsView) {
+        settingsView.classList.remove('active');
+      }
+
+      // Show the current tab (overview or future)
+      this.switchTab(this.currentTab);
+    } else if (page === 'settings') {
+      // Show settings page, hide dashboard
+      if (dashboard) {
+        dashboard.style.display = 'none';
+      }
+      if (settingsView) {
+        settingsView.classList.add('active');
+      }
+    }
+
+    // Update sidebar active state
+    if (this.sidebar) {
+      this.sidebar.setActive(page);
+    }
+  }
+
+  /**
+   * Switch between tabs within dashboard (overview/future)
+   */
+  switchTab(tab) {
+    console.log('[App] Switching to tab:', tab);
+    this.currentTab = tab;
+
+    // Update tab buttons
+    const tabs = document.querySelectorAll('.main-tab');
+    tabs.forEach(t => {
+      if (t.dataset.view === tab) {
+        t.classList.add('active');
+      } else {
+        t.classList.remove('active');
+      }
+    });
+
+    // Update tab views
+    const overviewView = document.getElementById('overview-view');
+    const futureView = document.getElementById('future-view');
+
+    if (tab === 'overview') {
+      overviewView.classList.add('active');
+      futureView.classList.remove('active');
+    } else if (tab === 'future') {
+      overviewView.classList.remove('active');
+      futureView.classList.add('active');
+
+      // Update future projection when switching to it
+      if (this.futureProjectionView) {
+        this.futureProjectionView.updateProjection();
+      }
+    }
+
+    // Dispatch view change event
+    window.dispatchEvent(new CustomEvent('view-changed', {
+      detail: { view: tab }
+    }));
+  }
+
+  /**
+   * Setup tab listeners for Overview/Future switching
+   */
+  setupTabListeners() {
+    const tabs = document.querySelectorAll('.main-tab');
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const view = tab.dataset.view;
+        this.switchTab(view);
+      });
+    });
+  }
+
   showDashboard() {
     document.getElementById('upload-section').style.display = 'none';
     document.getElementById('dashboard').classList.remove('hidden');
+
+    // Setup tab listeners
+    this.setupTabListeners();
+
+    // Navigate to dashboard page with overview tab by default
+    this.handleNavigation('dashboard');
+    this.switchTab('overview');
   }
 
   initializeComponents() {

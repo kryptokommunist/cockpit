@@ -2,6 +2,29 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# Install Python, pip, and Chrome dependencies
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    chromium \
+    chromium-chromedriver \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont
+
+# Set Chrome/Chromium environment variables
+ENV CHROME_BIN=/usr/bin/chromium-browser \
+    CHROME_PATH=/usr/lib/chromium/
+
+# Install dkb-robo and seleniumbase
+RUN pip3 install --no-cache-dir \
+    dkb_robo \
+    seleniumbase \
+    mycdp \
+    --break-system-packages
+
 # Copy package files
 COPY package*.json ./
 

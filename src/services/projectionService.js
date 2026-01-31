@@ -8,6 +8,28 @@ export class ProjectionService {
     this.recurringItems = [];  // Recurring income and expenses
     this.oneTimeItems = [];     // One-time future transactions
     this.storageKey = 'financial-projections';
+
+    // Time period settings for inference (specific date ranges)
+    const now = new Date();
+    const threeMonthsAgo = new Date(now);
+    threeMonthsAgo.setMonth(now.getMonth() - 3);
+    const sixMonthsAgo = new Date(now);
+    sixMonthsAgo.setMonth(now.getMonth() - 6);
+
+    this.timePeriodSettings = {
+      categoryAverages: {
+        startMonth: threeMonthsAgo.getMonth(),
+        startYear: threeMonthsAgo.getFullYear(),
+        endMonth: now.getMonth(),
+        endYear: now.getFullYear()
+      },
+      recurringDetection: {
+        startMonth: sixMonthsAgo.getMonth(),
+        startYear: sixMonthsAgo.getFullYear(),
+        endMonth: now.getMonth(),
+        endYear: now.getFullYear()
+      }
+    };
   }
 
   /**
@@ -187,7 +209,7 @@ export class ProjectionService {
       const monthKey = format(currentDate, 'yyyy-MM');
 
       // Check if there's a monthly override
-      const amount = item.monthlyOverrides && item.monthlyOverrides[monthKey]
+      const amount = item.monthlyOverrides && monthKey in item.monthlyOverrides
         ? item.monthlyOverrides[monthKey]
         : item.amount;
 
@@ -430,5 +452,64 @@ export class ProjectionService {
         .filter(i => i.frequency === 'monthly')
         .reduce((sum, i) => sum + Math.abs(i.amount), 0)
     };
+  }
+
+  /**
+   * Set time period for category averages
+   * @param {Object} range - Date range
+   * @param {number} range.startMonth - Start month (0-11)
+   * @param {number} range.startYear - Start year
+   * @param {number} range.endMonth - End month (0-11)
+   * @param {number} range.endYear - End year
+   */
+  setCategoryAveragesPeriod(range) {
+    this.timePeriodSettings.categoryAverages = range;
+    console.log(`[ProjectionService] Category averages period set to ${range.startMonth + 1}/${range.startYear} - ${range.endMonth + 1}/${range.endYear}`);
+  }
+
+  /**
+   * Set time period for recurring detection
+   * @param {Object} range - Date range
+   * @param {number} range.startMonth - Start month (0-11)
+   * @param {number} range.startYear - Start year
+   * @param {number} range.endMonth - End month (0-11)
+   * @param {number} range.endYear - End year
+   */
+  setRecurringDetectionPeriod(range) {
+    this.timePeriodSettings.recurringDetection = range;
+    console.log(`[ProjectionService] Recurring detection period set to ${range.startMonth + 1}/${range.startYear} - ${range.endMonth + 1}/${range.endYear}`);
+  }
+
+  /**
+   * Get time period settings
+   * @returns {Object}
+   */
+  getTimePeriodSettings() {
+    return {
+      categoryAverages: { ...this.timePeriodSettings.categoryAverages },
+      recurringDetection: { ...this.timePeriodSettings.recurringDetection }
+    };
+  }
+
+  /**
+   * Get date range for category averages
+   * @returns {Object} { startDate, endDate }
+   */
+  getCategoryAveragesDateRange() {
+    const settings = this.timePeriodSettings.categoryAverages;
+    const startDate = new Date(settings.startYear, settings.startMonth, 1);
+    const endDate = new Date(settings.endYear, settings.endMonth + 1, 0); // Last day of end month
+    return { startDate, endDate };
+  }
+
+  /**
+   * Get date range for recurring detection
+   * @returns {Object} { startDate, endDate }
+   */
+  getRecurringDetectionDateRange() {
+    const settings = this.timePeriodSettings.recurringDetection;
+    const startDate = new Date(settings.startYear, settings.startMonth, 1);
+    const endDate = new Date(settings.endYear, settings.endMonth + 1, 0); // Last day of end month
+    return { startDate, endDate };
   }
 }
