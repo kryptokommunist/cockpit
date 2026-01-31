@@ -426,40 +426,48 @@ class App {
    * Switch between tabs within dashboard (overview/future)
    */
   switchTab(tab) {
-    console.log('[App] Switching to tab:', tab);
-    this.currentTab = tab;
+    try {
+      console.log('[App] Switching to tab:', tab);
+      this.currentTab = tab;
 
-    // Update tab buttons
-    const tabs = document.querySelectorAll('.main-tab');
-    tabs.forEach(t => {
-      if (t.dataset.view === tab) {
-        t.classList.add('active');
-      } else {
-        t.classList.remove('active');
+      // Update tab buttons
+      const tabs = document.querySelectorAll('.main-tab');
+      tabs.forEach(t => {
+        if (t.dataset.view === tab) {
+          t.classList.add('active');
+        } else {
+          t.classList.remove('active');
+        }
+      });
+
+      // Update tab views
+      const overviewView = document.getElementById('overview-view');
+      const futureView = document.getElementById('future-view');
+
+      if (tab === 'overview') {
+        overviewView.classList.add('active');
+        futureView.classList.remove('active');
+      } else if (tab === 'future') {
+        overviewView.classList.remove('active');
+        futureView.classList.add('active');
+
+        // Update future projection when switching to it
+        if (this.futureProjectionView) {
+          try {
+            this.futureProjectionView.updateProjection();
+          } catch (error) {
+            console.error('[App] Error updating future projection:', error);
+          }
+        }
       }
-    });
 
-    // Update tab views
-    const overviewView = document.getElementById('overview-view');
-    const futureView = document.getElementById('future-view');
-
-    if (tab === 'overview') {
-      overviewView.classList.add('active');
-      futureView.classList.remove('active');
-    } else if (tab === 'future') {
-      overviewView.classList.remove('active');
-      futureView.classList.add('active');
-
-      // Update future projection when switching to it
-      if (this.futureProjectionView) {
-        this.futureProjectionView.updateProjection();
-      }
+      // Dispatch view change event
+      window.dispatchEvent(new CustomEvent('view-changed', {
+        detail: { view: tab }
+      }));
+    } catch (error) {
+      console.error('[App] Error switching tab:', error);
     }
-
-    // Dispatch view change event
-    window.dispatchEvent(new CustomEvent('view-changed', {
-      detail: { view: tab }
-    }));
   }
 
   /**

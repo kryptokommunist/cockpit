@@ -62,6 +62,12 @@ export class FutureProjectionView {
       return;
     }
 
+    // Check if recurringDetector is available
+    if (!this.recurringDetector) {
+      console.error('[FutureProjectionView] recurringDetector not available, cannot auto-populate');
+      return;
+    }
+
     console.log('[FutureProjectionView] Auto-populating from overview data...');
 
     // Get filtered transactions based on recurring detection period
@@ -214,12 +220,18 @@ export class FutureProjectionView {
         return;
       }
 
+      // Don't reload if recurringDetector is not available
+      if (!this.recurringDetector) {
+        console.log('[FutureProjectionView] recurringDetector not available, skipping reload');
+        return;
+      }
+
       console.log('[FutureProjectionView] Date range changed, reloading projections...');
 
-      try {
-        // Set flag inside try block so finally always runs
-        this.isReloading = true;
+      // Set flag before showing confirm
+      this.isReloading = true;
 
+      try {
         // Show confirmation
         if (!confirm('Date range updated. Reload projections with new settings? This will recalculate based on the selected time period.')) {
           console.log('[FutureProjectionView] User cancelled reload');
@@ -251,8 +263,17 @@ export class FutureProjectionView {
    */
   setupAddButtons() {
     // Add buttons to future charts
-    const futureRecurringContainer = document.querySelector('#future-recurring-chart').parentElement;
-    const futureCategoryContainer = document.querySelector('#future-category-chart').parentElement;
+    const futureRecurringChart = document.querySelector('#future-recurring-chart');
+    const futureCategoryChart = document.querySelector('#future-category-chart');
+
+    // Guard against missing DOM elements
+    if (!futureRecurringChart || !futureCategoryChart) {
+      console.warn('[FutureProjectionView] Chart containers not found, skipping button setup');
+      return;
+    }
+
+    const futureRecurringContainer = futureRecurringChart.parentElement;
+    const futureCategoryContainer = futureCategoryChart.parentElement;
 
     // Add reload button at the top
     const futureView = document.getElementById('future-view');
@@ -341,45 +362,54 @@ export class FutureProjectionView {
    * Update projection display
    */
   updateProjection() {
-    const now = new Date();
-    const startDate = startOfYear(now);
-    const endDate = endOfYear(now);
+    try {
+      const now = new Date();
+      const startDate = startOfYear(now);
+      const endDate = endOfYear(now);
 
-    // Generate projections
-    const projections = this.projectionService.generateProjections(startDate, endDate);
+      // Generate projections
+      const projections = this.projectionService.generateProjections(startDate, endDate);
 
-    console.log('[FutureProjectionView] Generated projections:', projections);
+      console.log('[FutureProjectionView] Generated projections:', projections);
 
-    // Calculate summary statistics
-    const monthlyIncome = projections
-      .filter(p => p.isIncome)
-      .reduce((sum, p) => sum + Math.abs(p.amount), 0) / 12;
+      // Calculate summary statistics
+      const monthlyIncome = projections
+        .filter(p => p.isIncome)
+        .reduce((sum, p) => sum + Math.abs(p.amount), 0) / 12;
 
-    const monthlyExpenses = projections
-      .filter(p => !p.isIncome)
-      .reduce((sum, p) => sum + Math.abs(p.amount), 0) / 12;
+      const monthlyExpenses = projections
+        .filter(p => !p.isIncome)
+        .reduce((sum, p) => sum + Math.abs(p.amount), 0) / 12;
 
-    const monthlyBalance = monthlyIncome - monthlyExpenses;
-    const yearlyTotal = monthlyBalance * 12;
+      const monthlyBalance = monthlyIncome - monthlyExpenses;
+      const yearlyTotal = monthlyBalance * 12;
 
-    // Update summary cards
-    document.getElementById('future-income').textContent = formatCurrency(monthlyIncome);
-    document.getElementById('future-expenses').textContent = formatCurrency(monthlyExpenses);
-    document.getElementById('future-balance').textContent = formatCurrency(monthlyBalance);
-    document.getElementById('future-total').textContent = formatCurrency(yearlyTotal);
+      // Update summary cards (with null checks)
+      const futureIncomeEl = document.getElementById('future-income');
+      const futureExpensesEl = document.getElementById('future-expenses');
+      const futureBalanceEl = document.getElementById('future-balance');
+      const futureTotalEl = document.getElementById('future-total');
 
-    // Update projection items list
-    this.renderProjectionItems();
+      if (futureIncomeEl) futureIncomeEl.textContent = formatCurrency(monthlyIncome);
+      if (futureExpensesEl) futureExpensesEl.textContent = formatCurrency(monthlyExpenses);
+      if (futureBalanceEl) futureBalanceEl.textContent = formatCurrency(monthlyBalance);
+      if (futureTotalEl) futureTotalEl.textContent = formatCurrency(yearlyTotal);
 
-    // Dispatch event to update charts
-    window.dispatchEvent(new CustomEvent('update-future-projection', {
-      detail: {
-        projections,
-        startDate,
-        endDate,
-        startingBalance: this.currentBalance || 0
-      }
-    }));
+      // Update projection items list
+      this.renderProjectionItems();
+
+      // Dispatch event to update charts
+      window.dispatchEvent(new CustomEvent('update-future-projection', {
+        detail: {
+          projections,
+          startDate,
+          endDate,
+          startingBalance: this.currentBalance || 0
+        }
+      }));
+    } catch (error) {
+      console.error('[FutureProjectionView] Error updating projection:', error);
+    }
   }
 
   /**
