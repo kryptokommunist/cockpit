@@ -145,6 +145,11 @@ export class SettingsView {
    * Setup event listeners
    */
   setupEventListeners() {
+    // Listen for DKB data refresh completion
+    window.addEventListener('dkb-data-refreshed', () => {
+      this.renderDataSourceStatus();
+    });
+
     // Export button
     const exportBtn = this.container.querySelector('#btn-export-rules');
     exportBtn.addEventListener('click', () => this.exportRules());

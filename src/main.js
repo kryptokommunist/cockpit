@@ -171,15 +171,43 @@ class App {
 
       const result = await this.dkbService.fetchAllData(credentials.username, credentials.password);
 
+      // Find the fresh account data with updated balance
+      const freshAccount = result.accounts.find(a => a.id === credentials.account.id);
+      if (!freshAccount) {
+        console.error('[App] Could not find account', credentials.account.id, 'in refreshed data');
+        this.showNotification('Error: Account not found in refreshed data', 'error');
+        return;
+      }
+
       // Filter transactions for the saved account
       const accountTransactions = result.transactions.filter(t => t.accountId === credentials.account.id);
+
+      // Update saved credentials with fresh account balance
+      const updatedCredentials = {
+        username: credentials.username,
+        password: btoa(credentials.password), // Re-encode password
+        account: {
+          id: freshAccount.id,
+          iban: freshAccount.iban,
+          name: freshAccount.name,
+          type: freshAccount.type,
+          balance: freshAccount.balance,
+          currency: freshAccount.currency || 'EUR'
+        },
+        savedAt: new Date().toISOString()
+      };
+      localStorage.setItem('dkb_credentials', JSON.stringify(updatedCredentials));
+      console.log('[App] Updated credentials with fresh balance:', freshAccount.balance);
 
       // Save new transactions
       localStorage.setItem('dkb_transactions', JSON.stringify(accountTransactions));
       localStorage.setItem('dkb_last_sync', new Date().toISOString());
 
-      // Process transactions
-      await this.handleDKBTransactions(accountTransactions, credentials.account);
+      // Process transactions with fresh account (includes updated balance)
+      await this.handleDKBTransactions(accountTransactions, freshAccount);
+
+      // Notify settings view to refresh its display
+      window.dispatchEvent(new CustomEvent('dkb-data-refreshed'));
 
       this.showNotification(`Refreshed ${accountTransactions.length} transactions from DKB`, 'success');
     } catch (error) {
