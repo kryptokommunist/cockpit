@@ -72,7 +72,7 @@ docker-compose logs webapp  # View error logs
 
 ## Port Reference
 
-- **3000**: Frontend dev server
+- **3003**: Frontend dev server
 - **3001**: Backend API
 
 ## Important Notes
