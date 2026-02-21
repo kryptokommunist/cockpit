@@ -4,7 +4,7 @@
  */
 export class DKBService {
   constructor() {
-    this.baseURL = 'http://localhost:3001';
+    this.baseURL = 'http://localhost:3005';
     this.accounts = [];
   }
 

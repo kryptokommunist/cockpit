@@ -374,7 +374,7 @@ export class SettingsView {
     resultDiv.textContent = 'Testing connection...';
 
     try {
-      const response = await fetch('http://localhost:3001/api/test');
+      const response = await fetch('http://localhost:3005/api/test');
       const data = await response.json();
 
       if (data.success) {

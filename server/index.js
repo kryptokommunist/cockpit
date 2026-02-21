@@ -4,7 +4,7 @@ import fetch from 'node-fetch';
 import { DKBService } from './dkbService.js';
 
 const app = express();
-const PORT = 3001;
+const PORT = 3005;
 
 // Load API configuration from environment variables or defaults
 const ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL || 'http://host.docker.internal:9988/anthropic/';
@@ -16,7 +16,7 @@ const dkbService = new DKBService();
 
 // Enable CORS for frontend
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: 'http://localhost:3004',
   credentials: true
 }));
 

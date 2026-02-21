@@ -6,7 +6,7 @@ export class LLMService {
   constructor() {
     // Use backend API instead of calling Claude directly
     // This avoids CORS issues entirely
-    this.backendUrl = 'http://localhost:3001/api';
+    this.backendUrl = 'http://localhost:3005/api';
     this.enabled = true; // Can be toggled by user
   }
 
