@@ -2743,6 +2743,15 @@
   margin-bottom: 2rem;
 }
 
+.projection-actions {
+  margin-bottom: 1.5rem;
+}
+
+.btn-update-averages {
+  font-size: 0.9rem;
+  padding: 0.5rem 1rem;
+}
+
 .projection-section {
   margin-bottom: 2rem;
 }

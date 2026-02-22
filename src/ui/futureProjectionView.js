@@ -308,6 +308,53 @@ export class FutureProjectionView {
   }
 
   /**
+   * Update category averages only (keeps manually added items)
+   */
+  async updateCategoryAverages() {
+    if (this.isReloading) {
+      console.log('[FutureProjectionView] Already reloading, skipping...');
+      return;
+    }
+
+    if (!this.transactions || this.transactions.length === 0) {
+      this.showNotification('No transaction data available', 'error');
+      return;
+    }
+
+    this.isReloading = true;
+    console.log('[FutureProjectionView] Updating category averages...');
+
+    try {
+      // Remove only existing "(Avg)" items
+      const recurringItems = this.projectionService.getRecurringItems();
+      const avgItems = recurringItems.filter(item => item.name.endsWith(' (Avg)'));
+
+      console.log(`[FutureProjectionView] Removing ${avgItems.length} existing average items`);
+
+      for (const item of avgItems) {
+        this.projectionService.removeRecurringItem(item.id);
+      }
+
+      // Recalculate and add category averages
+      this.addCategoryAverages();
+
+      // Save projections
+      await this.projectionService.save();
+
+      // Update display
+      this.updateProjection();
+
+      this.showNotification('Category averages updated successfully', 'success');
+      console.log('[FutureProjectionView] Category averages updated');
+    } catch (error) {
+      console.error('[FutureProjectionView] Error updating category averages:', error);
+      this.showNotification('Error updating averages: ' + error.message, 'error');
+    } finally {
+      this.isReloading = false;
+    }
+  }
+
+  /**
    * Reload projections from overview data
    */
   async reloadProjectionsFromOverview() {
@@ -419,6 +466,11 @@ export class FutureProjectionView {
     container.innerHTML = `
       <div class="card">
         <h2>Manage Projections</h2>
+        <div class="projection-actions">
+          <button class="btn btn-secondary btn-update-averages" title="Recalculate category averages based on current categorizations">
+            Update Avg Costs
+          </button>
+        </div>
 
         <div class="projection-section">
           <h3>Recurring Items (${recurringItems.length})</h3>
@@ -437,6 +489,12 @@ export class FutureProjectionView {
         </div>
       </div>
     `;
+
+    // Add event listener for update averages button
+    const updateAvgBtn = container.querySelector('.btn-update-averages');
+    if (updateAvgBtn) {
+      updateAvgBtn.addEventListener('click', () => this.updateCategoryAverages());
+    }
 
     // Add event listeners for edit/delete buttons
     container.querySelectorAll('.btn-edit-item').forEach(btn => {
