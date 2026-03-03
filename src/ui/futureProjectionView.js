@@ -496,6 +496,23 @@ export class FutureProjectionView {
       updateAvgBtn.addEventListener('click', () => this.updateCategoryAverages());
     }
 
+    // Add event listeners for toggle buttons
+    container.querySelectorAll('.btn-toggle-item').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const itemId = btn.dataset.itemId;
+        const itemType = btn.dataset.itemType;
+
+        if (itemType === 'recurring') {
+          this.projectionService.toggleRecurringItemEnabled(itemId);
+        } else {
+          this.projectionService.toggleOneTimeItemEnabled(itemId);
+        }
+
+        await this.projectionService.save();
+        this.updateProjection();
+      });
+    });
+
     // Add event listeners for edit/delete buttons
     container.querySelectorAll('.btn-edit-item').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -531,9 +548,10 @@ export class FutureProjectionView {
   renderRecurringItem(item) {
     const hasOverrides = item.monthlyOverrides && Object.keys(item.monthlyOverrides).length > 0;
     const sparkline = hasOverrides ? this.renderSparkline(item) : '';
+    const isEnabled = item.enabled !== false;
 
     return `
-      <div class="projection-item ${item.isIncome ? 'income' : 'expense'} ${hasOverrides ? 'has-overrides' : ''}">
+      <div class="projection-item ${item.isIncome ? 'income' : 'expense'} ${hasOverrides ? 'has-overrides' : ''} ${!isEnabled ? 'disabled' : ''}">
         <div class="item-info">
           <div class="item-name">${item.name}</div>
           <div class="item-details">
@@ -542,6 +560,9 @@ export class FutureProjectionView {
           ${sparkline}
         </div>
         <div class="item-actions">
+          <button class="btn-icon btn-toggle-item ${isEnabled ? 'enabled' : ''}" data-item-id="${item.id}" data-item-type="recurring" title="${isEnabled ? 'Disable' : 'Enable'}">
+            ${isEnabled ? '✓' : '○'}
+          </button>
           <button class="btn-icon btn-edit-item" data-item-id="${item.id}" data-item-type="recurring" title="Edit">
             ✏️
           </button>
@@ -617,8 +638,10 @@ export class FutureProjectionView {
    * Render one-time item
    */
   renderOneTimeItem(item) {
+    const isEnabled = item.enabled !== false;
+
     return `
-      <div class="projection-item ${item.isIncome ? 'income' : 'expense'}">
+      <div class="projection-item ${item.isIncome ? 'income' : 'expense'} ${!isEnabled ? 'disabled' : ''}">
         <div class="item-info">
           <div class="item-name">${item.name}</div>
           <div class="item-details">
@@ -626,6 +649,9 @@ export class FutureProjectionView {
           </div>
         </div>
         <div class="item-actions">
+          <button class="btn-icon btn-toggle-item ${isEnabled ? 'enabled' : ''}" data-item-id="${item.id}" data-item-type="onetime" title="${isEnabled ? 'Disable' : 'Enable'}">
+            ${isEnabled ? '✓' : '○'}
+          </button>
           <button class="btn-icon btn-edit-item" data-item-id="${item.id}" data-item-type="onetime" title="Edit">
             ✏️
           </button>

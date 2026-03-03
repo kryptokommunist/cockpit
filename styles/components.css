@@ -2792,6 +2792,20 @@
   border-left: 4px solid var(--danger-color);
 }
 
+.projection-item.disabled {
+  opacity: 0.5;
+  background-color: var(--bg-secondary);
+}
+
+.projection-item.disabled .item-name {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+.projection-item.disabled .item-details {
+  color: var(--text-muted, #999);
+}
+
 .item-info {
   flex: 1;
 }
@@ -2839,6 +2853,21 @@
 .btn-delete-item:hover {
   border-color: var(--danger-color);
   background-color: var(--danger-color);
+}
+
+.btn-toggle-item {
+  font-weight: bold;
+  color: var(--text-secondary);
+}
+
+.btn-toggle-item.enabled {
+  color: var(--success-color);
+  border-color: var(--success-color);
+  background-color: rgba(76, 175, 80, 0.1);
+}
+
+.btn-toggle-item:hover {
+  border-color: var(--primary-color);
 }
 
 .empty-message {

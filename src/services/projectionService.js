@@ -68,6 +68,7 @@ export class ProjectionService {
       startDate: item.startDate,
       endDate: item.endDate || null,
       isIncome: item.isIncome,
+      enabled: item.enabled !== false,  // Default to enabled
       monthlyOverridesCents: overridesCents,  // Store overrides as cents
       createdAt: new Date().toISOString()
     };
@@ -162,6 +163,21 @@ export class ProjectionService {
   }
 
   /**
+   * Toggle enabled state for a recurring item
+   * @param {string} id - Item ID
+   * @returns {boolean} New enabled state
+   */
+  toggleRecurringItemEnabled(id) {
+    const item = this.recurringItems.find(i => i.id === id);
+    if (item) {
+      item.enabled = item.enabled === false ? true : false;
+      console.log(`[ProjectionService] Toggled ${item.name} enabled: ${item.enabled}`);
+      return item.enabled;
+    }
+    return null;
+  }
+
+  /**
    * Remove a recurring item
    * @param {string} id - Item ID
    */
@@ -192,12 +208,28 @@ export class ProjectionService {
       category: item.category,
       date: item.date,
       isIncome: item.isIncome,
+      enabled: item.enabled !== false,  // Default to enabled
       createdAt: new Date().toISOString()
     };
 
     this.oneTimeItems.push(newItem);
     console.log('[ProjectionService] Added one-time item:', newItem);
     return newItem;
+  }
+
+  /**
+   * Toggle enabled state for a one-time item
+   * @param {string} id - Item ID
+   * @returns {boolean} New enabled state
+   */
+  toggleOneTimeItemEnabled(id) {
+    const item = this.oneTimeItems.find(i => i.id === id);
+    if (item) {
+      item.enabled = item.enabled === false ? true : false;
+      console.log(`[ProjectionService] Toggled ${item.name} enabled: ${item.enabled}`);
+      return item.enabled;
+    }
+    return null;
   }
 
   /**
@@ -223,14 +255,16 @@ export class ProjectionService {
   generateProjections(startDate, endDate) {
     const projections = [];
 
-    // Generate recurring items
+    // Generate recurring items (only enabled ones)
     this.recurringItems.forEach(item => {
+      if (item.enabled === false) return;  // Skip disabled items
       const itemProjections = this.generateRecurringProjections(item, startDate, endDate);
       projections.push(...itemProjections);
     });
 
-    // Add one-time items within range
+    // Add one-time items within range (only enabled ones)
     this.oneTimeItems.forEach(item => {
+      if (item.enabled === false) return;  // Skip disabled items
       const itemDate = new Date(item.date);
       if (itemDate >= startDate && itemDate <= endDate) {
         // Get amount in euros (handles both old and new format)
