@@ -131,9 +131,10 @@ app.use(express.json({ limit: '10mb' }));
 if (IS_CF) {
   const distDir = path.join(__dirname, '..', 'dist');
 
-  // Token check middleware for all non-API, non-health routes
+  // Token check middleware for all non-API, non-health, non-asset routes
   app.use((req, res, next) => {
     if (req.path.startsWith('/api/') || req.path === '/health') return next();
+    if (req.path.startsWith('/assets/') || req.path.endsWith('.svg') || req.path.endsWith('.ico')) return next();
     if (ACCESS_TOKEN && req.query.token !== ACCESS_TOKEN) {
       return res.status(401).send('Unauthorized: missing or invalid ?token=');
     }
