@@ -1,0 +1,20 @@
+---
+applications:
+  - name: cockpit-financial
+    memory: 512M
+    disk_quota: 2G
+    instances: 1
+    buildpacks:
+      - nodejs_buildpack
+    command: node server/index.js
+    services:
+      - rosetta-aicore
+    env:
+      NODE_ENV: production
+      PORT: 3005
+      ACCESS_TOKEN: ((ACCESS_TOKEN))
+      GENAI_PROXY_URL: https://genaiproxy.cfapps.eu01.hana.ondemand.com/anthropic/v1/messages
+      GENAI_API_KEY: ((GENAI_API_KEY))
+      GENAI_MODEL: claude-sonnet-4-5
+      AICORE_DEPLOYMENT_ID: d34c832f51430c83
+      AICORE_RESOURCE_GROUP: default

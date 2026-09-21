@@ -1,27 +1,153 @@
 import express from 'express';
 import cors from 'cors';
 import fetch from 'node-fetch';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { DKBService } from './dkbService.js';
 
-const app = express();
-const PORT = 3005;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Load API configuration from environment variables or defaults
+const app = express();
+const PORT = process.env.PORT || 3005;
+const IS_CF = !!process.env.VCAP_SERVICES;
+
+// Parse CF VCAP_SERVICES for AI Core and GenAI proxy credentials
+function parseVcapServices() {
+  const vcap = process.env.VCAP_SERVICES;
+  if (!vcap) return { aicore: null };
+  try {
+    const services = JSON.parse(vcap);
+    let aicore = null;
+    for (const key of Object.keys(services)) {
+      if (key.toLowerCase().includes('aicore')) {
+        const creds = services[key][0]?.credentials || {};
+        const uaa = creds.uaa || {};
+        const urls = creds.serviceurls || {};
+        aicore = {
+          clientId: uaa.clientid || creds.clientid,
+          clientSecret: uaa.clientsecret || creds.clientsecret,
+          authUrl: uaa.url || creds.url,
+          apiUrl: urls.AI_API_URL || creds.AI_API_URL,
+        };
+      }
+    }
+    return { aicore };
+  } catch {
+    return { aicore: null };
+  }
+}
+
+const { aicore: _cfAicore } = parseVcapServices();
+
+// Simple token cache for AI Core OAuth
+const _aicoreTokenCache = { token: null, expiresAt: 0 };
+
+async function getAicoreToken() {
+  const now = Date.now() / 1000;
+  if (_aicoreTokenCache.token && now < _aicoreTokenCache.expiresAt - 30) {
+    return _aicoreTokenCache.token;
+  }
+  const resp = await fetch(`${_cfAicore.authUrl}/oauth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: _cfAicore.clientId,
+      client_secret: _cfAicore.clientSecret,
+    }),
+  });
+  if (!resp.ok) throw new Error(`AI Core auth failed: ${resp.status}`);
+  const data = await resp.json();
+  _aicoreTokenCache.token = data.access_token;
+  _aicoreTokenCache.expiresAt = now + (data.expires_in || 3600);
+  return _aicoreTokenCache.token;
+}
+
+function useAicore() {
+  return !!(
+    _cfAicore?.clientId &&
+    _cfAicore?.clientSecret &&
+    _cfAicore?.authUrl &&
+    _cfAicore?.apiUrl
+  );
+}
+
+// Build the URL + headers + body for a Claude/AI Core messages request
+async function buildLlmRequest(requestBody) {
+  const AICORE_DEPLOYMENT_ID = process.env.AICORE_DEPLOYMENT_ID || 'd34c832f51430c83';
+  const AICORE_RESOURCE_GROUP = process.env.AICORE_RESOURCE_GROUP || 'default';
+  const GENAI_PROXY_URL = process.env.GENAI_PROXY_URL || 'http://host.docker.internal:9988/anthropic/v1/messages';
+  const GENAI_API_KEY = process.env.GENAI_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN || '';
+  const GENAI_MODEL = process.env.GENAI_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5';
+
+  if (useAicore()) {
+    const token = await getAicoreToken();
+    const url = `${_cfAicore.apiUrl}/v2/inference/deployments/${AICORE_DEPLOYMENT_ID}/v1/messages`;
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'AI-Resource-Group': AICORE_RESOURCE_GROUP,
+      'anthropic-version': '2023-06-01',
+    };
+    return { url, headers, body: { ...requestBody, model: GENAI_MODEL } };
+  }
+
+  // GenAI proxy / local proxy fallback
+  const url = GENAI_PROXY_URL;
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-api-key': GENAI_API_KEY,
+    'anthropic-version': '2023-06-01',
+  };
+  return { url, headers, body: { ...requestBody, model: GENAI_MODEL } };
+}
+
+// Resolve the model name to report to callers
+function resolvedModel() {
+  return process.env.GENAI_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-5';
+}
+
+// Legacy env vars kept for local dev / Docker
 const ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL || 'http://host.docker.internal:9988/anthropic/';
-const ANTHROPIC_AUTH_TOKEN = process.env.ANTHROPIC_AUTH_TOKEN || 'sk-aB1cD2eF3gH4jK5lM6nP7qR8sT9uV0wX1yZ2bC3nM4pK5sL6';
-const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'anthropic--claude-4.5-sonnet';
+const ANTHROPIC_AUTH_TOKEN = process.env.ANTHROPIC_AUTH_TOKEN || '';
+const ANTHROPIC_MODEL = resolvedModel();
+
+// Access token guard for the frontend (CF deployments only)
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN || '';
 
 // Initialize DKB service
 const dkbService = new DKBService();
 
 // Enable CORS for frontend
 app.use(cors({
-  origin: 'http://localhost:3004',
-  credentials: true
+  origin: IS_CF ? true : 'http://localhost:3004',
+  credentials: true,
 }));
 
 // Parse JSON bodies
 app.use(express.json({ limit: '10mb' }));
+
+// Serve built frontend on CF (dist/ is built before cf push)
+if (IS_CF) {
+  const distDir = path.join(__dirname, '..', 'dist');
+
+  // Token check middleware for all non-API, non-health routes
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api/') || req.path === '/health') return next();
+    if (ACCESS_TOKEN && req.query.token !== ACCESS_TOKEN) {
+      return res.status(401).send('Unauthorized: missing or invalid ?token=');
+    }
+    next();
+  });
+
+  app.use(express.static(distDir));
+
+  // SPA fallback — pass token through
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/') || req.path === '/health') return next();
+    res.sendFile(path.join(distDir, 'index.html'));
+  });
+}
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -31,46 +157,29 @@ app.get('/health', (req, res) => {
 // Get API configuration
 app.get('/api/config', (req, res) => {
   res.json({
-    model: ANTHROPIC_MODEL,
-    available: true
+    model: resolvedModel(),
+    available: true,
+    backend: useAicore() ? 'aicore' : 'genai-proxy',
   });
 });
 
 // Test API connection
 app.get('/api/test', async (req, res) => {
   try {
-    const response = await fetch(`${ANTHROPIC_BASE_URL}v1/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_AUTH_TOKEN,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: 10,
-        messages: [{
-          role: 'user',
-          content: 'test'
-        }]
-      })
+    const { url, headers, body } = await buildLlmRequest({
+      max_tokens: 10,
+      messages: [{ role: 'user', content: 'test' }],
     });
+    const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
 
     if (response.ok) {
       res.json({ success: true, status: response.status });
     } else {
       const text = await response.text();
-      res.status(response.status).json({
-        success: false,
-        status: response.status,
-        error: text
-      });
+      res.status(response.status).json({ success: false, status: response.status, error: text });
     }
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -95,19 +204,8 @@ app.post('/api/claude', async (req, res) => {
       });
     }
 
-    // Build Claude request with tools if provided
-    const requestBody = {
-      model: ANTHROPIC_MODEL,
-      max_tokens: maxTokens,
-      messages: [{
-        role: 'user',
-        content: prompt
-      }]
-    };
-
-    if (tools && tools.length > 0) {
-      requestBody.tools = tools;
-    }
+    // Build Claude request with tools if provided (unused, kept for reference)
+    void { model: resolvedModel(), max_tokens: maxTokens };
 
     // Set up streaming if requested
     if (streaming) {
@@ -122,19 +220,15 @@ app.post('/api/claude', async (req, res) => {
     // Loop to handle tool calls (increased to 10 for multi-step thinking)
     for (let iteration = 0; iteration < 10; iteration++) {
       console.log(`[Claude API] Iteration ${iteration + 1}/10`);
-      const response = await fetch(`${ANTHROPIC_BASE_URL}v1/messages`, {
+      const { url: llmUrl, headers: llmHeaders, body: llmBodyBase } = await buildLlmRequest({
+        max_tokens: maxTokens,
+        messages: conversationMessages,
+        tools: tools.length > 0 ? tools : undefined,
+      });
+      const response = await fetch(llmUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_AUTH_TOKEN,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: ANTHROPIC_MODEL,
-          max_tokens: maxTokens,
-          messages: conversationMessages,
-          tools: tools.length > 0 ? tools : undefined
-        })
+        headers: llmHeaders,
+        body: JSON.stringify(llmBodyBase),
       });
 
       if (!response.ok) {
@@ -689,21 +783,14 @@ Examples of INCORRECT responses (DO NOT DO THIS):
 
 Your response:`;
 
-          const response = await fetch(`${ANTHROPIC_BASE_URL}v1/messages`, {
+          const { url: llmUrl2, headers: llmHeaders2, body: llmBody2 } = await buildLlmRequest({
+            max_tokens: 50,
+            messages: [{ role: 'user', content: prompt }],
+          });
+          const response = await fetch(llmUrl2, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': ANTHROPIC_AUTH_TOKEN,
-              'anthropic-version': '2023-06-01'
-            },
-            body: JSON.stringify({
-              model: ANTHROPIC_MODEL,
-              max_tokens: 50,
-              messages: [{
-                role: 'user',
-                content: prompt
-              }]
-            })
+            headers: llmHeaders2,
+            body: JSON.stringify(llmBody2),
           });
 
           if (response.ok) {
@@ -974,7 +1061,7 @@ app.post('/api/dkb/parse-csv', async (req, res) => {
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Backend server running on http://0.0.0.0:${PORT}`);
-  console.log(`API Base URL: ${ANTHROPIC_BASE_URL}`);
-  console.log(`Model: ${ANTHROPIC_MODEL}`);
+  console.log(`LLM backend: ${useAicore() ? 'AI Core' : 'GenAI Proxy'}`);
+  console.log(`Model: ${resolvedModel()}`);
   console.log(`DKB integration endpoints available`);
 });

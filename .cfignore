@@ -1,0 +1,25 @@
+# Node
+node_modules/
+
+# Dev source (served as pre-built dist/)
+src/
+styles/
+index.html
+vite.config.js
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+
+# Dev/local
+.git/
+.gitignore
+*.md
+screenshots/
+umsatz.csv
+
+# Secrets
+vars.yml
+
+# Mac
+.DS_Store
