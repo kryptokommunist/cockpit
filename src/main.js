@@ -23,6 +23,7 @@ import { RecategorizeModal } from './ui/recategorizeModal.js';
 import { FutureProjectionView } from './ui/futureProjectionView.js';
 import { Transaction } from './models/Transaction.js';
 import { formatCurrency } from './utils/numberUtils.js';
+import { loadDemoData } from './demoData.js';
 
 /**
  * Main application class
@@ -759,4 +760,9 @@ class App {
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   new App();
+
+  document.getElementById('load-demo-btn')?.addEventListener('click', () => {
+    loadDemoData();
+    window.location.reload();
+  });
 });
